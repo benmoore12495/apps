@@ -398,8 +398,13 @@
     "joaquin niemann": "joaquin niemann"  // normalized from "Joaquín"
   };
 
-  const ESPN_URL =
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+  // Try multiple ESPN endpoints — PGA Championship is served under its own
+  // league code separate from regular PGA Tour events.
+  const ESPN_URLS = [
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pgachampionship",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=mens-pgachampionship",
+  ];
 
   // ── Helpers ──────────────────────────────────────────────────────────────
   function formatScore(n) {
@@ -486,21 +491,31 @@
   function buildPlayerMap(data) {
     const map = {};
     const events = data?.events ?? [];
-    let competitors = [];
-    for (const ev of events) {
-      const comps = ev?.competitions?.[0]?.competitors ?? [];
-      if (comps.length > 0) { competitors = comps; break; }
-    }
+
+    // Prefer the event whose name contains "PGA Championship"; fall back to
+    // whichever event has the most competitors.
+    const isPGA = ev => /pga championship/i.test(ev?.name ?? "") ||
+                        /pga championship/i.test(ev?.shortName ?? "");
+    const pgaEv = events.find(isPGA);
+    const targetEv = pgaEv ?? events.reduce(
+      (best, ev) => {
+        const n = ev?.competitions?.[0]?.competitors?.length ?? 0;
+        return n > (best?.competitions?.[0]?.competitors?.length ?? 0) ? ev : best;
+      }, null);
+
+    const competitors = targetEv?.competitions?.[0]?.competitors ?? [];
+
     for (const comp of competitors) {
       const displayName = comp?.athlete?.displayName ?? "";
       if (!displayName) continue;
       const key = normalizeName(displayName);
       map[key] = { displayName, ...parseCompetitor(comp) };
     }
-    // Determine the leading score across the entire field
+
     const allScores = Object.values(map).map(p => p.score);
     const leadingScore = allScores.length > 0 ? Math.min(...allScores) : null;
-    return { map, leadingScore };
+    const eventName = targetEv?.name ?? "Unknown event";
+    return { map, leadingScore, eventName, playerCount: competitors.length };
   }
 
   // ── Render one side's table + return totals ──────────────────────────────
@@ -575,10 +590,22 @@
     renderSkeleton("andrewBody");
 
     try {
-      const resp = await fetch(ESPN_URL, { cache: "no-store" });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const data = await resp.json();
-      const { map: playerMap, leadingScore } = buildPlayerMap(data);
+      // Try each URL until one returns data with competitors
+      let playerMap, leadingScore, eventName, playerCount;
+      let lastErr = null;
+      for (const url of ESPN_URLS) {
+        try {
+          const resp = await fetch(url, { cache: "no-store" });
+          if (!resp.ok) { lastErr = `HTTP ${resp.status}`; continue; }
+          const data = await resp.json();
+          const result = buildPlayerMap(data);
+          if (result.playerCount > 0) {
+            ({ map: playerMap, leadingScore, eventName, playerCount } = result);
+            break;
+          }
+        } catch (e) { lastErr = e.message; }
+      }
+      if (!playerMap || playerCount === 0) throw new Error(lastErr ?? "No data found");
 
       const benR    = renderSide(PICKS.ben,    playerMap, leadingScore, "benBody",    "benTop4",    "benAll5");
       const andrewR = renderSide(PICKS.andrew, playerMap, leadingScore, "andrewBody", "andrewTop4", "andrewAll5");
@@ -597,8 +624,9 @@
       setLeadPill("leadTop4", benR.top4,    andrewR.top4,    false);
       setLeadPill("leadAll",  benR.allSum,  andrewR.allSum,  true);
 
+      const time = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
       document.getElementById("lastUpdated").textContent =
-        `Last updated: ${new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+        `Last updated: ${time} · ${eventName} (${playerCount} players)`;
 
     } catch (err) {
       errEl.textContent = `Could not load live scores: ${err.message}`;
