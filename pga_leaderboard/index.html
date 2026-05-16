@@ -508,6 +508,19 @@
       if (!displayName) continue;
       const key = normalizeName(displayName);
       map[key] = { displayName, ...parseCompetitor(comp) };
+      // Temporary debug: log raw ESPN fields for our picks
+      const allPicks = ["scheffler","schauffele","lowry","niemann","young","reed","koepka","rahm","thomas","spieth"];
+      if (allPicks.some(p => key.includes(p))) {
+        console.log(`[ESPN] ${displayName}`, {
+          "score.displayValue":          comp?.score?.displayValue,
+          "status.score.displayValue":   comp?.status?.score?.displayValue,
+          "status.currentRound":         comp?.status?.currentRound,
+          "status.thru":                 comp?.status?.thru,
+          "status.displayValue":         comp?.status?.displayValue,
+          "statistics":                  comp?.statistics?.map(s => `${s.name}=${s.displayValue}`),
+          "linescores":                  comp?.linescores?.map(l => l.displayValue ?? l.value),
+        });
+      }
     }
 
     const allScores = Object.values(map).map(p => p.score);
