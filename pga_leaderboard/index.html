@@ -469,11 +469,13 @@
 
   // ── Render one side's table + return totals ──────────────────────────────
   function renderSide(picks, playerMap, tbodyId, top4ElId, all5ElId) {
-    const rows = picks.map(name => {
-      const key  = normalizeName(name);
-      const data = playerMap[key] ?? { score: 0, round: "–", thru: "–", missing: true };
-      return { name, data };
-    });
+    const rows = picks
+      .map(name => {
+        const key  = normalizeName(name);
+        const data = playerMap[key] ?? { score: 0, round: "–", thru: "–", missing: true };
+        return { name, data };
+      })
+      .sort((a, b) => a.data.score - b.data.score);
 
     const scores = rows.map(r => r.data.score);
     const allSum = scores.reduce((s, v) => s + v, 0);
