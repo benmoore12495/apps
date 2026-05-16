@@ -457,32 +457,30 @@
 
   // ── Parse ESPN competitor into {score, round, thru} ─────────────────────
   function parseCompetitor(comp) {
-    const rawScore = comp?.score?.displayValue ?? "E";
+    // Primary paths (confirmed ESPN golf API structure):
+    //   score  → comp.status.score.displayValue
+    //   round  → comp.status.currentRound  (integer 1-4)
+    //   thru   → comp.status.thru          (integer 0-18; 0=not started, 18=finished)
+    // Fall back to legacy paths in case ESPN changes the shape again.
+
+    const rawScore =
+      comp?.status?.score?.displayValue ??
+      comp?.score?.displayValue ??
+      "E";
     const score = rawScore === "E" ? 0 : parseInt(rawScore, 10);
 
-    // Round: status.period is 1-4 for golf rounds; guard against stray values
-    const period = comp?.status?.period ?? 0;
-    const linescoreCount = comp?.linescores?.length ?? 0;
-    let round = "–";
-    if (period >= 1 && period <= 4) {
-      round = `R${period}`;
-    } else if (linescoreCount >= 1 && linescoreCount <= 4) {
-      round = `R${linescoreCount}`;
-    }
+    const currentRound =
+      comp?.status?.currentRound ??
+      comp?.status?.period ??
+      comp?.linescores?.length ??
+      0;
+    const round = (currentRound >= 1 && currentRound <= 4) ? `R${currentRound}` : "–";
 
-    // Thru: status.displayValue wrongly returns the season year (e.g. "2026").
-    // The correct field is status.type.shortDetail e.g. "Thru 9", "F", "Thru F"
-    const shortDetail = comp?.status?.type?.shortDetail ?? "";
+    const thruRaw = comp?.status?.thru ?? -1;
     let thru = "–";
-    if (/^F$/i.test(shortDetail) || /thru\s+f/i.test(shortDetail)) {
-      thru = "F";
-    } else {
-      const m = shortDetail.match(/(?:thru\s+)?(\d{1,2})/i);
-      if (m) {
-        const hole = parseInt(m[1], 10);
-        if (hole >= 1 && hole <= 18) thru = String(hole);
-      }
-    }
+    if (thruRaw === 18)                          thru = "F";
+    else if (thruRaw >= 1 && thruRaw <= 17)      thru = String(thruRaw);
+    // thruRaw === 0 means not yet started → leave as "–"
 
     return { score, round, thru };
   }
