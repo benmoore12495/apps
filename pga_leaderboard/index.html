@@ -344,6 +344,14 @@
   </div>
 </div>
 
+<!-- Debug panel -->
+<div style="max-width:1100px;margin:16px auto;">
+  <details>
+    <summary style="cursor:pointer;color:#6b7280;font-size:0.8rem;letter-spacing:0.08em;text-transform:uppercase;user-select:none;">▶ Debug — Raw ESPN fields</summary>
+    <pre id="debugOut" style="margin-top:10px;background:#0d0f14;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:16px;font-size:0.72rem;color:#9aa0ad;overflow-x:auto;white-space:pre-wrap;word-break:break-all;">Hit Refresh Scores to populate…</pre>
+  </details>
+</div>
+
 <!-- Comparison summary -->
 <div class="summary">
 
@@ -502,23 +510,26 @@
       }, null);
 
     const competitors = targetEv?.competitions?.[0]?.competitors ?? [];
+    const debugRows = [];
 
     for (const comp of competitors) {
       const displayName = comp?.athlete?.displayName ?? "";
       if (!displayName) continue;
       const key = normalizeName(displayName);
       map[key] = { displayName, ...parseCompetitor(comp) };
-      // Temporary debug: log raw ESPN fields for our picks
+      // Debug: capture raw ESPN fields for our picks
       const allPicks = ["scheffler","schauffele","lowry","niemann","young","reed","koepka","rahm","thomas","spieth"];
       if (allPicks.some(p => key.includes(p))) {
-        console.log(`[ESPN] ${displayName}`, {
-          "score.displayValue":          comp?.score?.displayValue,
-          "status.score.displayValue":   comp?.status?.score?.displayValue,
-          "status.currentRound":         comp?.status?.currentRound,
-          "status.thru":                 comp?.status?.thru,
-          "status.displayValue":         comp?.status?.displayValue,
-          "statistics":                  comp?.statistics?.map(s => `${s.name}=${s.displayValue}`),
-          "linescores":                  comp?.linescores?.map(l => l.displayValue ?? l.value),
+        debugRows.push({
+          name:                        displayName,
+          "score.displayValue":        comp?.score?.displayValue,
+          "status.score.displayValue": comp?.status?.score?.displayValue,
+          "status.currentRound":       comp?.status?.currentRound,
+          "status.period":             comp?.status?.period,
+          "status.thru":               comp?.status?.thru,
+          "status.displayValue":       comp?.status?.displayValue,
+          "statistics":                comp?.statistics?.map(s => `${s.name}:${s.displayValue}`),
+          "linescores":                comp?.linescores?.map(l => l.displayValue ?? l.value),
         });
       }
     }
@@ -526,6 +537,15 @@
     const allScores = Object.values(map).map(p => p.score);
     const leadingScore = allScores.length > 0 ? Math.min(...allScores) : null;
     const eventName = targetEv?.name ?? "Unknown event";
+
+    // Write debug rows to on-page panel
+    const debugEl = document.getElementById("debugOut");
+    if (debugEl) {
+      debugEl.textContent = debugRows.length
+        ? debugRows.map(r => JSON.stringify(r, null, 2)).join("\n\n")
+        : "No matching picks found in ESPN response.";
+    }
+
     return { map, leadingScore, eventName, playerCount: competitors.length };
   }
 
