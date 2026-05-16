@@ -471,11 +471,16 @@
     //   thru   → comp.status.thru          (integer 0-18; 0=not started, 18=finished)
     // Fall back to legacy paths in case ESPN changes the shape again.
 
+    // Score: pull from statistics "score to par" entry — most up-to-date field
+    const scoreStat = comp?.statistics?.find(
+      s => s.name?.toLowerCase().includes("score to par")
+    );
     const rawScore =
+      scoreStat?.displayValue ??
       comp?.status?.score?.displayValue ??
       comp?.score?.displayValue ??
       "E";
-    const score = rawScore === "E" ? 0 : parseInt(rawScore, 10);
+    const score = (rawScore === "E" || rawScore === "0") ? 0 : parseInt(rawScore, 10);
 
     const currentRound =
       comp?.status?.currentRound ??
