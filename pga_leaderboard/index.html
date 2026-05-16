@@ -473,7 +473,7 @@
 
     // Score: pull from statistics "score to par" entry — most up-to-date field
     const scoreStat = comp?.statistics?.find(
-      s => s.name?.toLowerCase().includes("score to par")
+      s => s.name?.toLowerCase().replace(/\s/g, "") === "scoretopar"
     );
     const rawScore =
       scoreStat?.displayValue ??
