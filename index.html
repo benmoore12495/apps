@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PGA Championship 2026 – Pick'em</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111318;
+      color: #e8e8e8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      padding: 32px 16px 48px;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .site-header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.6rem);
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      color: #f5c842;
+      text-transform: uppercase;
+    }
+    .site-header .subtitle {
+      font-size: 0.95rem;
+      color: #9aa0ad;
+      margin-top: 4px;
+    }
+    .last-updated {
+      font-size: 0.82rem;
+      color: #6b7280;
+      margin-top: 10px;
+    }
+
+    /* ── Refresh button ── */
+    .refresh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 18px auto 0;
+      padding: 12px 28px;
+      background: #f5c842;
+      color: #111318;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+    .refresh-btn:hover { background: #f0bb20; }
+    .refresh-btn:active { transform: scale(0.97); }
+    .refresh-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error banner ── */
+    .error-banner {
+      display: none;
+      background: #3b1a1a;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      color: #fca5a5;
+      font-size: 0.85rem;
+      padding: 10px 16px;
+      margin: 12px auto;
+      max-width: 760px;
+      text-align: center;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ── Layout ── */
+    .boards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 1100px;
+      margin: 32px auto 20px;
+    }
+    @media (max-width: 680px) {
+      .boards { grid-template-columns: 1fr; }
+    }
+
+    /* ── Player card ── */
+    .card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .card.ben   { background: #1a2740; border-top: 3px solid #3b82f6; }
+    .card.andrew { background: #2a1a1a; border-top: 3px solid #ef4444; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+    }
+    .card-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .card-total {
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    /* ── Table ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead tr {
+      background: rgba(0,0,0,0.25);
+    }
+    thead th {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6b7280;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    thead th:not(:first-child) { text-align: center; }
+
+    tbody tr {
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    tbody tr.dropped {
+      opacity: 0.45;
+    }
+    tbody tr.dropped td:first-child::after {
+      content: " ✕";
+      font-size: 0.7rem;
+      color: #ef4444;
+    }
+    tbody td {
+      padding: 13px 12px;
+      font-size: 0.98rem;
+    }
+    tbody td:not(:first-child) { text-align: center; }
+    .player-name { font-weight: 600; }
+
+    .score-val { font-weight: 700; font-size: 1.05rem; }
+    .under { color: #4ade80; }
+    .over  { color: #f87171; }
+    .even  { color: #e8e8e8; }
+
+    .round-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.8rem;
+      color: #9aa0ad;
+    }
+
+    /* loading placeholder */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 4px;
+      height: 1em;
+      display: inline-block;
+      min-width: 40px;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── Summary strip ── */
+    .summary {
+      max-width: 1100px;
+      margin: 0 auto 12px;
+      background: #1c1f26;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 20px 24px;
+    }
+    .summary h2 {
+      text-align: center;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+    .summary-side { display: flex; flex-direction: column; gap: 8px; }
+    .summary-side.right { align-items: flex-end; }
+    .summary-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .summary-score-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .summary-score-row.right { align-items: flex-end; }
+    .summary-big {
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .summary-sub {
+      font-size: 0.78rem;
+      color: #9aa0ad;
+    }
+
+    .vs-col { text-align: center; }
+    .vs-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+    .lead-text {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #f5c842;
+      white-space: nowrap;
+    }
+    .lead-text.tied { color: #9aa0ad; }
+
+    .divider { width: 1px; background: rgba(255,255,255,0.08); height: 60px; margin: auto; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>PGA Championship 2026</h1>
+  <p class="subtitle">Pick'em Score Comparison</p>
+  <p class="last-updated" id="lastUpdated">–</p>
+  <br>
+  <button class="refresh-btn" id="refreshBtn" onclick="fetchScores()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+    </svg>
+    Refresh Scores
+  </button>
+  <div class="error-banner" id="errorBanner"></div>
+</header>
+
+<!-- Boards -->
+<div class="boards">
+  <div class="card ben">
+    <div class="card-header">
+      <span class="card-name">Ben</span>
+      <span class="card-total score-val" id="benTotal">–</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Score</th>
+          <th>Round</th>
+          <th>Thru</th>
+        </tr>
+      </thead>
+      <tbody id="benBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card andrew">
+    <div class="card-header">
+      <span class="card-name">Andrew</span>
+      <span class="card-total score-val" id="andrewTotal">–</span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Score</th>
+          <th>Round</th>
+          <th>Thru</th>
+        </tr>
+      </thead>
+      <tbody id="andrewBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary">
+  <h2>Comparison</h2>
+  <div class="summary-grid">
+    <div class="summary-side left">
+      <div class="summary-label">Ben</div>
+      <div class="summary-score-row">
+        <span class="summary-big score-val" id="sumBenAll">–</span>
+        <span class="summary-sub">All 5 players</span>
+      </div>
+      <div class="summary-score-row">
+        <span class="summary-big score-val" id="sumBenTop4" style="font-size:1.4rem">–</span>
+        <span class="summary-sub">Top 4 players</span>
+      </div>
+    </div>
+
+    <div class="vs-col">
+      <div class="vs-label">VS</div>
+      <div class="divider"></div>
+      <div style="margin-top:8px">
+        <div class="summary-sub" style="text-align:center;margin-bottom:3px">All 5</div>
+        <div class="lead-text" id="leadAll">–</div>
+        <div class="summary-sub" style="text-align:center;margin:8px 0 3px">Top 4</div>
+        <div class="lead-text" id="leadTop4">–</div>
+      </div>
+    </div>
+
+    <div class="summary-side right">
+      <div class="summary-label">Andrew</div>
+      <div class="summary-score-row right">
+        <span class="summary-big score-val" id="sumAndrewAll">–</span>
+        <span class="summary-sub">All 5 players</span>
+      </div>
+      <div class="summary-score-row right">
+        <span class="summary-big score-val" id="sumAndrewTop4" style="font-size:1.4rem">–</span>
+        <span class="summary-sub">Top 4 players</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Picks configuration ──────────────────────────────────────────────────
+  const PICKS = {
+    ben:    ["Scottie Scheffler","Xander Schauffele","Shane Lowry","Joaquin Niemann","Cam Young"],
+    andrew: ["Patrick Reed","Brooks Koepka","Jon Rahm","Justin Thomas","Jordan Spieth"]
+  };
+
+  // ESPN Golf API – PGA Tour leaderboard (no key required, public endpoint)
+  const ESPN_URL =
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function scoreNum(displayValue) {
+    if (!displayValue || displayValue === "E") return 0;
+    return parseInt(displayValue, 10);
+  }
+
+  function formatScore(n) {
+    if (n === 0) return "E";
+    return n > 0 ? `+${n}` : `${n}`;
+  }
+
+  function scoreClass(n) {
+    if (n < 0) return "under";
+    if (n > 0) return "over";
+    return "even";
+  }
+
+  function top4Sum(scores) {
+    // Best 4 = lowest 4 values (most under par)
+    return [...scores].sort((a,b) => a - b).slice(0, 4).reduce((s, v) => s + v, 0);
+  }
+
+  function leadText(benVal, andrewVal, elId) {
+    const el = document.getElementById(elId);
+    const diff = Math.abs(benVal - andrewVal);
+    let txt, cls;
+    if (benVal === andrewVal) { txt = "Tied"; cls = "tied"; }
+    else if (benVal < andrewVal) { txt = `Ben leads by ${diff}`; cls = ""; }
+    else { txt = `Andrew leads by ${diff}`; cls = ""; }
+    el.textContent = txt;
+    el.className = "lead-text" + (cls ? ` ${cls}` : "");
+  }
+
+  function normalizeName(n) {
+    return n.toLowerCase().replace(/[^a-z]/g, "");
+  }
+
+  // ── Render skeleton rows while loading ───────────────────────────────────
+  function renderSkeleton(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    tbody.innerHTML = Array.from({length: 5}).map(() => `
+      <tr>
+        <td><span class="skeleton" style="width:120px"></span></td>
+        <td><span class="skeleton" style="width:30px"></span></td>
+        <td><span class="skeleton" style="width:28px"></span></td>
+        <td><span class="skeleton" style="width:24px"></span></td>
+      </tr>`).join("");
+  }
+
+  // ── Build player map from ESPN response ──────────────────────────────────
+  function buildPlayerMap(data) {
+    const map = {}; // normalized name → {score, round, thru, displayName}
+
+    // ESPN structure: events[0].competitions[0].competitors[]
+    const events = data?.events ?? [];
+    // Find the current/most-recent PGA Championship event
+    // or fall back to the first event
+    let competitors = [];
+    for (const ev of events) {
+      const comps = ev?.competitions?.[0]?.competitors ?? [];
+      if (comps.length > 0) { competitors = comps; break; }
+    }
+
+    for (const comp of competitors) {
+      const displayName = comp?.athlete?.displayName ?? "";
+      const rawScore   = comp?.score?.displayValue ?? "E";
+      const period     = comp?.status?.period ?? 1;       // round number
+      const thru       = comp?.status?.displayValue ?? ""; // "F" or hole number
+
+      // thru: ESPN gives "F" for finished, hole number for in-progress
+      let thruDisplay = thru;
+      if (thru === "F") thruDisplay = "F";
+      else if (!isNaN(parseInt(thru))) thruDisplay = parseInt(thru).toString();
+
+      map[normalizeName(displayName)] = {
+        score: rawScore === "E" ? 0 : parseInt(rawScore, 10),
+        round: `R${period}`,
+        thru: thruDisplay || "–",
+        displayName
+      };
+    }
+    return map;
+  }
+
+  // ── Render one side ──────────────────────────────────────────────────────
+  function renderSide(picks, playerMap, tbodyId, totalId) {
+    const tbody = document.getElementById(tbodyId);
+    const rows   = picks.map(name => {
+      const key  = normalizeName(name);
+      const data = playerMap[key] ?? { score: 0, round: "–", thru: "–", displayName: name, missing: true };
+      return { name, data };
+    });
+
+    // Determine which player is dropped (worst score in top-4 calculation)
+    const scores = rows.map(r => r.data.score);
+    const sorted = [...scores].sort((a, b) => a - b);
+    // The score that gets dropped is the one NOT in the best 4
+    // Find which index is the "extra" worst
+    const top4Scores = sorted.slice(0, 4);
+    let droppedIdx = -1;
+    const usedIndices = new Set();
+    for (let i = 0; i < rows.length; i++) {
+      const s = rows[i].data.score;
+      const inTop4 = top4Scores.some((v, j) => v === s && !usedIndices.has(j) && (usedIndices.add(j), true));
+      if (!inTop4) { droppedIdx = i; break; }
+    }
+
+    tbody.innerHTML = rows.map((r, i) => {
+      const { data } = r;
+      const sc  = formatScore(data.score);
+      const cls = scoreClass(data.score);
+      const dropped = i === droppedIdx ? " dropped" : "";
+      return `
+        <tr class="${dropped}">
+          <td class="player-name">${r.name}</td>
+          <td><span class="score-val ${cls}">${sc}</span></td>
+          <td><span class="round-badge">${data.round}</span></td>
+          <td>${data.thru}</td>
+        </tr>`;
+    }).join("");
+
+    const allSum  = scores.reduce((s, v) => s + v, 0);
+    const top4    = top4Sum(scores);
+
+    const totalEl = document.getElementById(totalId);
+    totalEl.textContent = formatScore(allSum);
+    totalEl.className   = `card-total score-val ${scoreClass(allSum)}`;
+
+    return { allSum, top4 };
+  }
+
+  // ── Main fetch ───────────────────────────────────────────────────────────
+  async function fetchScores() {
+    const btn   = document.getElementById("refreshBtn");
+    const errEl = document.getElementById("errorBanner");
+    btn.classList.add("spinning");
+    errEl.classList.remove("visible");
+
+    renderSkeleton("benBody");
+    renderSkeleton("andrewBody");
+
+    try {
+      const resp = await fetch(ESPN_URL, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+
+      const playerMap = buildPlayerMap(data);
+
+      const benResult    = renderSide(PICKS.ben,    playerMap, "benBody",    "benTotal");
+      const andrewResult = renderSide(PICKS.andrew, playerMap, "andrewBody", "andrewTotal");
+
+      // Summary – all 5
+      const setScore = (id, val) => {
+        const el = document.getElementById(id);
+        el.textContent = formatScore(val);
+        el.className   = `summary-big score-val ${scoreClass(val)}`;
+      };
+      setScore("sumBenAll",    benResult.allSum);
+      setScore("sumAndrewAll", andrewResult.allSum);
+      setScore("sumBenTop4",   benResult.top4);
+      setScore("sumAndrewTop4",andrewResult.top4);
+
+      leadText(benResult.allSum, andrewResult.allSum, "leadAll");
+      leadText(benResult.top4,   andrewResult.top4,   "leadTop4");
+
+      const now = new Date();
+      document.getElementById("lastUpdated").textContent =
+        `Last updated: ${now.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})}`;
+
+    } catch (err) {
+      errEl.textContent = `Could not load live scores: ${err.message}. Showing last known data.`;
+      errEl.classList.add("visible");
+    } finally {
+      btn.classList.remove("spinning");
+    }
+  }
+
+  // Load on page open
+  fetchScores();
+</script>
+</body>
+</html>
