@@ -315,6 +315,7 @@
   <button class="tab-btn" onclick="switchTab('pga')">PGA Championship</button>
   <button class="tab-btn" onclick="switchTab('usopen')">US Open</button>
   <button class="tab-btn" onclick="switchTab('theopen')">The Open</button>
+  <button class="tab-btn" style="border-color:rgba(139,92,246,0.4);color:#a78bfa" onclick="switchTab('debug')">🔧 Debug</button>
 </div>
 
 <div id="panel-overall" class="tab-panel active">
@@ -350,6 +351,55 @@
 
 <div id="panel-theopen" class="tab-panel">
   <div class="leaderboard-wrap" id="theopen-content"></div>
+</div>
+
+<div id="panel-debug" class="tab-panel">
+  <div style="max-width:900px;margin:0 auto;padding:0 4px">
+
+    <!-- Scoreboard header probe -->
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Scoreboard Header Events</h2>
+        <button onclick="probeScoreboard()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Fetch</button>
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:10px;word-break:break-all">
+        URL: https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga&region=us&lang=en&contentorigin=espn
+      </div>
+      <div id="debug-scoreboard" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:340px;overflow:auto">
+        Click Fetch to load…
+      </div>
+    </div>
+
+    <!-- Event ID tester -->
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Test Event ID</h2>
+        <input id="debug-event-id" placeholder="e.g. 401580351" style="padding:6px 10px;background:#1c1f26;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#e8e8e8;font-size:0.85rem;width:160px" />
+        <button onclick="probeEventId()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Fetch</button>
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:10px">
+        Hits: site.web.api.espn.com …/golf/pga/leaderboard/players?event=ID  &amp;  site.api.espn.com …/leaderboard?league=pga&amp;event=ID
+      </div>
+      <div id="debug-event" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:460px;overflow:auto">
+        Enter an event ID and click Fetch…
+      </div>
+    </div>
+
+    <!-- Raw leaderboard probe (no event ID) -->
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Current Leaderboard (no event ID)</h2>
+        <button onclick="probeCurrentLeaderboard()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Fetch</button>
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:10px;word-break:break-all">
+        URL: https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga
+      </div>
+      <div id="debug-current" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:340px;overflow:auto">
+        Click Fetch to load…
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script>
@@ -481,8 +531,119 @@ function switchTab(id) {
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById("panel-" + id).classList.add("active");
-  const idx = ["overall","masters","pga","usopen","theopen"].indexOf(id);
+  const idx = ["overall","masters","pga","usopen","theopen","debug"].indexOf(id);
   document.querySelectorAll(".tab-btn")[idx].classList.add("active");
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DEBUG FUNCTIONS
+// ─────────────────────────────────────────────────────────────────────────────
+function debugOut(elId, text) {
+  document.getElementById(elId).textContent = text;
+}
+
+async function probeScoreboard() {
+  debugOut("debug-scoreboard", "Loading…");
+  try {
+    const url = "https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga&region=us&lang=en&contentorigin=espn";
+    const resp = await fetch(url, { cache: "no-store" });
+    const data = await resp.json();
+
+    const events = data?.sports?.[0]?.leagues?.[0]?.events ?? [];
+    if (!events.length) { debugOut("debug-scoreboard", "No events found in response.\n\nRaw keys: " + Object.keys(data).join(", ")); return; }
+
+    const lines = events.map((ev, i) => {
+      const id     = ev?.id ?? "?";
+      const name   = ev?.name ?? ev?.shortName ?? "?";
+      const date   = ev?.date ?? "?";
+      const status = ev?.status?.type?.name ?? ev?.status ?? "?";
+      const season = ev?.season?.year ?? "?";
+      return `[${i}] ID: ${id}  |  ${name}  |  ${date}  |  status: ${status}  |  season: ${season}`;
+    });
+
+    debugOut("debug-scoreboard", lines.join("\n\n") + "\n\n--- RAW events[0] ---\n" + JSON.stringify(events[0], null, 2).slice(0, 2000));
+  } catch(e) {
+    debugOut("debug-scoreboard", "ERROR: " + e.message);
+  }
+}
+
+async function probeEventId() {
+  const eventId = document.getElementById("debug-event-id").value.trim();
+  if (!eventId) { debugOut("debug-event", "Enter an event ID first."); return; }
+  debugOut("debug-event", "Loading both endpoints for event " + eventId + "…");
+
+  const results = [];
+
+  // Endpoint 1: site.web.api.espn.com (from the Apps Script)
+  try {
+    const url1 = `https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/leaderboard/players?region=us&lang=en&event=${eventId}`;
+    const r1 = await fetch(url1, { cache: "no-store" });
+    const d1 = await r1.json();
+    const lb = d1?.leaderboard ?? [];
+    results.push(`=== site.web.api.espn.com (${r1.status}) ===`);
+    if (lb.length) {
+      results.push(`Found ${lb.length} players. Top 5:`);
+      lb.slice(0, 5).forEach(p => {
+        const score = p?.stats?.find(s => s.abbreviation === "SC")?.displayValue ?? p?.score?.displayValue ?? "?";
+        results.push(`  ${p?.displayName ?? "?"} — score: ${score}`);
+      });
+      results.push("\nRaw leaderboard[0]:\n" + JSON.stringify(lb[0], null, 2).slice(0, 1000));
+    } else {
+      results.push("No leaderboard data. Keys: " + Object.keys(d1).join(", "));
+      results.push(JSON.stringify(d1, null, 2).slice(0, 800));
+    }
+  } catch(e) {
+    results.push("=== site.web.api.espn.com ERROR: " + e.message + " ===");
+  }
+
+  results.push("\n");
+
+  // Endpoint 2: site.api.espn.com (what we've been using)
+  try {
+    const url2 = `https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=${eventId}`;
+    const r2 = await fetch(url2, { cache: "no-store" });
+    const d2 = await r2.json();
+    const evs = d2?.events ?? [];
+    results.push(`=== site.api.espn.com (${r2.status}) ===`);
+    results.push(`Events in response: ${evs.length}`);
+    evs.forEach((ev, i) => {
+      const comps = ev?.competitions?.[0]?.competitors ?? [];
+      results.push(`  [${i}] id:${ev?.id}  name:"${ev?.name}"  competitors:${comps.length}`);
+      if (comps.length) {
+        const top3 = comps.slice(0, 3).map(c => `${c?.athlete?.displayName} (${c?.score?.displayValue})`).join(", ");
+        results.push(`       top 3: ${top3}`);
+      }
+    });
+  } catch(e) {
+    results.push("=== site.api.espn.com ERROR: " + e.message + " ===");
+  }
+
+  debugOut("debug-event", results.join("\n"));
+}
+
+async function probeCurrentLeaderboard() {
+  debugOut("debug-current", "Loading…");
+  try {
+    const url = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+    const resp = await fetch(url, { cache: "no-store" });
+    const data = await resp.json();
+    const evs  = data?.events ?? [];
+
+    const lines = [`Total events: ${evs.length}\n`];
+    evs.forEach((ev, i) => {
+      const comps  = ev?.competitions?.[0]?.competitors ?? [];
+      const status = ev?.competitions?.[0]?.status?.type?.name ?? "?";
+      lines.push(`[${i}] id:${ev?.id}  name:"${ev?.name}"  status:${status}  competitors:${comps.length}`);
+      if (comps.length) {
+        const top3 = comps.slice(0, 3).map(c => `${c?.athlete?.displayName} (${c?.score?.displayValue})`).join(", ");
+        lines.push(`     top 3: ${top3}`);
+      }
+    });
+
+    debugOut("debug-current", lines.join("\n"));
+  } catch(e) {
+    debugOut("debug-current", "ERROR: " + e.message);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
