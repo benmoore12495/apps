@@ -386,7 +386,7 @@
     </div>
 
     <!-- Raw leaderboard probe (no event ID) -->
-    <div>
+    <div style="margin-bottom:28px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
         <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Current Leaderboard (no event ID)</h2>
         <button onclick="probeCurrentLeaderboard()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Fetch</button>
@@ -396,6 +396,32 @@
       </div>
       <div id="debug-current" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:340px;overflow:auto">
         Click Fetch to load…
+      </div>
+    </div>
+
+    <!-- Season schedule probe -->
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Full 2026 Season Schedule</h2>
+        <button onclick="probeSeasonSchedule()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Fetch</button>
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:10px;word-break:break-all">
+        Tries several schedule/calendar endpoints looking for all 2026 events with IDs
+      </div>
+      <div id="debug-schedule" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:400px;overflow:auto">
+        Click Fetch to load…
+      </div>
+    </div>
+
+    <!-- Nearby ID scanner -->
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Scan Nearby Event IDs</h2>
+        <span style="font-size:0.75rem;color:#6b7280">CJ Cup = 401811948. Scanning 401811920 → 401811948 to find PGA/Masters.</span>
+        <button onclick="scanNearbyIds()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Scan</button>
+      </div>
+      <div id="debug-scan" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:400px;overflow:auto">
+        Click Scan to start (takes ~10s, checks 28 IDs)…
       </div>
     </div>
 
@@ -890,6 +916,84 @@ function renderTournament(t) {
       </thead>
       <tbody>${pickRows}</tbody>
     </table>`;
+}
+
+async function probeSeasonSchedule() {
+  debugOut("debug-schedule", "Trying multiple schedule endpoints…\n");
+  const el = document.getElementById("debug-schedule");
+
+  const endpoints = [
+    `https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&season=2026&limit=100`,
+    `https://site.api.espn.com/apis/site/v2/sports/golf/schedule?league=pga&season=2026`,
+    `https://sports.core.api.espn.com/v2/sports/golf/leagues/pga/seasons/2026/events?limit=100`,
+    `https://site.web.api.espn.com/apis/v2/scoreboard/header?sport=golf&league=pga&region=us&lang=en&contentorigin=espn&season=2026&limit=100`,
+  ];
+
+  for (const url of endpoints) {
+    el.textContent += `\n--- ${url.split("?")[0].split("/").slice(-2).join("/")} ---\n`;
+    try {
+      const resp = await fetch(url, { cache: "no-store" });
+      const data = await resp.json();
+
+      // Try common paths where event lists live
+      const candidates = [
+        data?.events,
+        data?.sports?.[0]?.leagues?.[0]?.events,
+        data?.items,
+        data?.leaderboard,
+      ].filter(Boolean);
+
+      if (!candidates.length) {
+        el.textContent += `  HTTP ${resp.status} — keys: ${Object.keys(data).join(", ")}\n`;
+        el.textContent += "  " + JSON.stringify(data).slice(0, 300) + "\n";
+        continue;
+      }
+
+      for (const list of candidates) {
+        if (!Array.isArray(list)) continue;
+        el.textContent += `  Found array of ${list.length} items:\n`;
+        list.slice(0, 30).forEach(ev => {
+          const id   = ev?.id ?? ev?.$ref?.split("/").pop() ?? "?";
+          const name = ev?.name ?? ev?.shortName ?? ev?.fullName ?? "?";
+          const date = ev?.date ?? ev?.startDate ?? "?";
+          el.textContent += `    ID:${id}  |  ${name}  |  ${date}\n`;
+        });
+      }
+    } catch(e) {
+      el.textContent += `  ERROR: ${e.message}\n`;
+    }
+  }
+}
+
+async function scanNearbyIds() {
+  const el = document.getElementById("debug-scan");
+  el.textContent = "Scanning IDs 401811920 → 401811948…\n\n";
+  const base = 401811920;
+  const top  = 401811948; // CJ Cup (known)
+
+  for (let id = top; id >= base; id--) {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=${id}`;
+    try {
+      const resp = await fetch(url, { cache: "no-store" });
+      const data = await resp.json();
+      const evs  = data?.events ?? [];
+      const found = evs.find(e => (e?.competitions?.[0]?.competitors?.length ?? 0) > 0);
+      if (found) {
+        const comps = found?.competitions?.[0]?.competitors ?? [];
+        const top1  = comps[0]?.athlete?.displayName ?? "?";
+        const score = comps[0]?.score?.displayValue ?? "?";
+        const status = found?.competitions?.[0]?.status?.type?.name ?? "?";
+        el.textContent += `✅ ID ${id}: "${found.name}" (${status}) — leader: ${top1} ${score}\n`;
+      } else {
+        el.textContent += `   ID ${id}: no data\n`;
+      }
+    } catch(e) {
+      el.textContent += `   ID ${id}: error — ${e.message}\n`;
+    }
+    // Small delay to avoid rate limiting
+    await new Promise(r => setTimeout(r, 200));
+  }
+  el.textContent += "\nDone.";
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
