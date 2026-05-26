@@ -732,7 +732,7 @@ function processEvent(event) {
 
     const score     = rawScore === "E" ? 0 : parseInt(rawScore, 10);
     const missedCut = statusId === "6";
-    const madecut   = !missedCut && period >= 4;
+    const madecut   = !missedCut && period >= 3;
 
     if (madecut) madeCutScores.push(score);
     playerMap[norm(displayName)] = { displayName, score, period, thru, madecut, missedCut };
