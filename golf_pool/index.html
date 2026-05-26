@@ -445,6 +445,14 @@
 </div>
 
 <script>
+// Players who withdrew / did not participate — treated same as missed cut
+const DID_NOT_PLAY = {
+  masters: ["Will Zalatoris"],
+  pga:     ["Tony Finau"],
+  usopen:  [],
+  theopen: [],
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PICKS DATA  (3 players per contestant per major)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -752,12 +760,16 @@ async function fetchTournament(t) {
 // ─────────────────────────────────────────────────────────────────────────────
 // SCORING LOGIC
 // ─────────────────────────────────────────────────────────────────────────────
-function getPlayerScore(playerName, playerMap, worstMadeCutScore) {
+function getPlayerScore(playerName, playerMap, worstMadeCutScore, tourneyKey) {
+  const dnp = (DID_NOT_PLAY[tourneyKey] ?? []).map(norm);
+  if (dnp.includes(norm(playerName))) {
+    return { score: worstMadeCutScore, mc: true, displayName: playerName };
+  }
+
   const key  = norm(playerName);
   const data = playerMap[key];
 
   if (!data) {
-    // Not found in ESPN data — show -99 as a sentinel so it's visible in UI
     return { score: -99, mc: false, notFound: true, displayName: playerName };
   }
 
@@ -774,7 +786,7 @@ function calcContestantTourneyScore(contestant, tourneyKey, tData) {
   const picks = contestant.picks[tourneyKey];
   let total = 0;
   for (const p of picks) {
-    const r = getPlayerScore(p, playerMap, worstMadeCutScore);
+    const r = getPlayerScore(p, playerMap, worstMadeCutScore, tourneyKey);
     total += (r.score ?? 0);
   }
   return total;
@@ -896,7 +908,7 @@ function renderTournament(t) {
   // Build rows with scores
   const rows = CONTESTANTS.map(c => {
     const picks = c.picks[t.key];
-    const pickResults = picks.map(p => getPlayerScore(p, playerMap, worstMadeCutScore));
+    const pickResults = picks.map(p => getPlayerScore(p, playerMap, worstMadeCutScore, t.key));
     const total = pickResults.reduce((s, r) => s + (r.score ?? 0), 0);
     return { name: c.name, picks, pickResults, total };
   });
