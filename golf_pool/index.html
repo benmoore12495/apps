@@ -57,7 +57,6 @@
     .refresh-btn:hover { background: #f0bb20; }
     .refresh-btn:active { transform: scale(0.97); }
     .refresh-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .refresh-btn.spinning svg { animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Error banner ── */
@@ -384,34 +383,76 @@ const CONTESTANTS = [
 // TOURNAMENT CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 const TOURNAMENTS = [
-  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",
-    espnMatch: ["Masters Tournament","The Masters","masters tournament"],
-    tryDates: ["20260413","20260412","20260411","20260410","20260409"],
-    tryNoLeague: true,   // Masters is not PGA Tour sanctioned — try without league param too
-    tryCurrentEvent: false,
-    complete: true  },
-  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Championship",
-    espnMatch: ["PGA Championship"],
-    tryDates: ["20260517","20260516","20260515","20260514"],
-    tryNoLeague: false,
-    tryCurrentEvent: true,  // Most recent completed event — try no-date param first
-    complete: true  },
-  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",
-    espnMatch: ["U.S. Open","US Open","United States Open"],
-    tryDates: [],
-    tryNoLeague: false,
-    tryCurrentEvent: false,
-    complete: false },
-  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",
-    espnMatch: ["The Open Championship","British Open"],
-    tryDates: [],
-    tryNoLeague: false,
-    tryCurrentEvent: false,
-    complete: false },
+  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",   complete: true  },
+  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Champ.", complete: true  },
+  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",   complete: false },
+  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",  complete: false },
 ];
 
-const ESPN_BASE    = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
-const ESPN_NOLEG   = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard";
+// ─────────────────────────────────────────────────────────────────────────────
+// HARDCODED FINAL SCORES  (from spreadsheet · scores relative to par)
+// Masters: Augusta National, par 72 (288 total). MC penalty = 300 strokes = +12
+// PGA Championship: par 72 (288 total). MC penalty = 298 strokes = +10
+// ─────────────────────────────────────────────────────────────────────────────
+const HARDCODED = {
+  masters: {
+    eventName: "Masters Tournament 2026",
+    isComplete: true,
+    mcPenalty: 12,
+    mc: new Set([
+      "bryson dechambeau","akshay bhatia","will zalatoris","tony finau","jj spaun",
+    ]),
+    scores: {
+      "rory mcilroy": -12,
+      "scottie scheffler": -11,
+      "cameron young": -10,
+      "justin rose": -10,
+      "colin morikawa": -9, "collin morikawa": -9,
+      "sam burns": -9,
+      "xander schauffele": -8,
+      "hideki matsuyama": -5,
+      "jordan spieth": -5,
+      "patrick reed": -5,
+      "patrick cantlay": -5,
+      "matt fitzpatrick": -4, "matthew fitzpatrick": -4,
+      "ludvig aberg": -3,
+      "matt mccarty": -2,
+      "chris gotterup": -2,
+      "tommy fleetwood": 0,
+      "ben griffin": 0,
+      "jon rahm": 1,
+    },
+  },
+  pga: {
+    eventName: "PGA Championship 2026",
+    isComplete: true,
+    mcPenalty: 10,
+    mc: new Set([
+      "victor hovland","wyndham clark","jacob bridgeman","patrick cantlay",
+      "tony finau","bryson dechambeau",
+    ]),
+    scores: {
+      "jon rahm": -14,
+      "justin thomas": -13,
+      "ludvig aberg": -13,
+      "rory mcilroy": -12,
+      "xander schauffele": -12,
+      "chris gotterup": -11,
+      "justin rose": -11,
+      "scottie scheffler": -10,
+      "matt fitzpatrick": -10, "matthew fitzpatrick": -10,
+      "min woo lee": -9,
+      "jordan spieth": -9,
+      "hideki matsuyama": -8,
+      "cameron young": -8,
+      "si woo kim": -7,
+      "collin morikawa": -5, "colin morikawa": -5,
+      "brooks koepka": -5,
+      "sahith theegala": -4,
+      "ryan gerard": -1,
+    },
+  },
+};
 
 // Cache: tournamentId → { playerMap, worstMadeCutScore, eventName, isLive, isComplete }
 const cache = {};
@@ -445,89 +486,30 @@ function switchTab(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ESPN FETCH
+// BUILD TOURNAMENT DATA FROM HARDCODED SCORES
 // ─────────────────────────────────────────────────────────────────────────────
+function buildTournamentData(t) {
+  if (!t.complete) return null;
 
-function nameMatchesMajor(espnName, t) {
-  const n = (espnName ?? "").toLowerCase();
-  return t.espnMatch.some(m => n.includes(m.toLowerCase()));
-}
+  const hc = HARDCODED[t.id];
+  if (!hc) return null;
 
-function processEvent(event, t) {
-  const competitors = event?.competitions?.[0]?.competitors ?? [];
-  const eventName   = event?.name ?? t.name;
-  const compStatus  = event?.competitions?.[0]?.status?.type?.id ?? "";
-  const isLive      = compStatus === "2";
-  const isComplete  = compStatus === "3";
+  const playerMap = {};
 
-  const playerMap      = {};
-  const madeCutScores  = [];
-
-  for (const comp of competitors) {
-    const displayName = comp?.athlete?.displayName ?? "";
-    const rawScore    = comp?.score?.displayValue ?? "E";
-    const period      = comp?.status?.period ?? 0;
-    const thru        = comp?.status?.displayValue ?? "–";
-    const statusId    = comp?.status?.type?.id ?? "";
-
-    const score      = rawScore === "E" ? 0 : parseInt(rawScore, 10);
-    const missedCut  = statusId === "6";
-    const madecut    = !missedCut && (period >= 4 || (isComplete && statusId === "3"));
-
-    if (madecut) madeCutScores.push(score);
-
-    playerMap[norm(displayName)] = { displayName, score, period, thru, madecut, missedCut };
+  for (const [key, score] of Object.entries(hc.scores)) {
+    playerMap[key] = { displayName: key, score, madecut: true, missedCut: false };
+  }
+  for (const key of hc.mc) {
+    playerMap[key] = { displayName: key, score: hc.mcPenalty, madecut: false, missedCut: true };
   }
 
-  const worstMadeCutScore = madeCutScores.length > 0 ? Math.max(...madeCutScores) : null;
-  return { playerMap, worstMadeCutScore, eventName, isLive, isComplete };
-}
-
-async function tryFetchEvent(url, t) {
-  try {
-    const resp = await fetch(url, { cache: "no-store" });
-    if (!resp.ok) return null;
-    const data  = await resp.json();
-    const events = data?.events ?? [];
-    for (const ev of events) {
-      const ename = (ev?.name ?? "") + " " + (ev?.shortName ?? "");
-      if (nameMatchesMajor(ename, t)) return processEvent(ev, t);
-    }
-  } catch {}
-  return null;
-}
-
-async function fetchTournament(t) {
-  if (!t.complete) return null; // Upcoming — nothing to fetch yet
-
-  // For PGA: mirror the working PGA tracker exactly — fetch current leaderboard,
-  // take first event with competitors, no name check required.
-  if (t.tryCurrentEvent) {
-    try {
-      const resp = await fetch(ESPN_BASE, { cache: "no-store" });
-      if (resp.ok) {
-        const data = await resp.json();
-        const events = data?.events ?? [];
-        for (const ev of events) {
-          if ((ev?.competitions?.[0]?.competitors?.length ?? 0) > 0) {
-            return processEvent(ev, t);
-          }
-        }
-      }
-    } catch {}
-  }
-
-  // For other completed tournaments: try each date in the week, require name match
-  for (const d of t.tryDates) {
-    const urlsToTry = [`${ESPN_BASE}&dates=${d}`];
-    if (t.tryNoLeague) urlsToTry.push(`${ESPN_NOLEG}?dates=${d}`);
-    for (const url of urlsToTry) {
-      const result = await tryFetchEvent(url, t);
-      if (result) return result;
-    }
-  }
-
-  return null; // Tournament data not available
+  return {
+    playerMap,
+    worstMadeCutScore: hc.mcPenalty,
+    eventName: hc.eventName,
+    isLive: false,
+    isComplete: hc.isComplete,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -538,16 +520,11 @@ function getPlayerScore(playerName, playerMap, worstMadeCutScore) {
   const data = playerMap[key];
 
   if (!data) {
-    // Not found in ESPN data — treat as MC if we have a penalty
-    return { score: worstMadeCutScore, mc: true, notFound: true, thru: "–", period: 0, displayName: playerName };
+    // Not in our score table — treat as MC
+    return { score: worstMadeCutScore, mc: true, displayName: playerName };
   }
 
   if (data.missedCut) {
-    return { ...data, score: worstMadeCutScore ?? data.score, mc: true };
-  }
-
-  // If tournament is complete and player only played 2 rounds, they missed cut
-  if (data.period === 2 && data.madecut === false) {
     return { ...data, score: worstMadeCutScore ?? data.score, mc: true };
   }
 
@@ -767,37 +744,16 @@ function formatDate(dateStr) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN REFRESH
+// MAIN LOAD
 // ─────────────────────────────────────────────────────────────────────────────
-async function refreshAll() {
-  const btn   = document.getElementById("refreshBtn");
-  const errEl = document.getElementById("errorBanner");
-  btn.classList.add("spinning");
-  errEl.classList.remove("visible");
-
-  const errors = [];
-
-  await Promise.all(TOURNAMENTS.map(async t => {
-    try {
-      cache[t.id] = await fetchTournament(t);
-    } catch (e) {
-      errors.push(`${t.shortName}: ${e.message}`);
-      // Keep whatever was in cache (if anything)
-    }
-  }));
-
-  if (errors.length) {
-    errEl.textContent = "Could not load: " + errors.join("; ");
-    errEl.classList.add("visible");
+function refreshAll() {
+  for (const t of TOURNAMENTS) {
+    cache[t.id] = buildTournamentData(t);
   }
-
   renderOverall();
   for (const t of TOURNAMENTS) renderTournament(t);
-
   document.getElementById("lastUpdated").textContent =
-    `Last updated: ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-
-  btn.classList.remove("spinning");
+    `Scores from Masters & PGA Championship 2026 final results`;
 }
 
 // Load on open
