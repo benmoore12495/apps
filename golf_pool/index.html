@@ -500,24 +500,31 @@ async function tryFetchEvent(url, t) {
 async function fetchTournament(t) {
   if (!t.complete) return null; // Upcoming — nothing to fetch yet
 
-  // Build list of URLs to try in priority order
-  const urls = [];
-
-  // 1. For PGA: try no-date endpoint first (most recent completed event)
+  // For PGA: mirror the working PGA tracker exactly — fetch current leaderboard,
+  // take first event with competitors, no name check required.
   if (t.tryCurrentEvent) {
-    urls.push(ESPN_BASE);
+    try {
+      const resp = await fetch(ESPN_BASE, { cache: "no-store" });
+      if (resp.ok) {
+        const data = await resp.json();
+        const events = data?.events ?? [];
+        for (const ev of events) {
+          if ((ev?.competitions?.[0]?.competitors?.length ?? 0) > 0) {
+            return processEvent(ev, t);
+          }
+        }
+      }
+    } catch {}
   }
 
-  // 2. Try each date within the tournament week (final round first)
+  // For other completed tournaments: try each date in the week, require name match
   for (const d of t.tryDates) {
-    urls.push(`${ESPN_BASE}&dates=${d}`);
-    // For Masters: also try without league restriction
-    if (t.tryNoLeague) urls.push(`${ESPN_NOLEG}?dates=${d}`);
-  }
-
-  for (const url of urls) {
-    const result = await tryFetchEvent(url, t);
-    if (result) return result;
+    const urlsToTry = [`${ESPN_BASE}&dates=${d}`];
+    if (t.tryNoLeague) urlsToTry.push(`${ESPN_NOLEG}?dates=${d}`);
+    for (const url of urlsToTry) {
+      const result = await tryFetchEvent(url, t);
+      if (result) return result;
+    }
   }
 
   return null; // Tournament data not available
