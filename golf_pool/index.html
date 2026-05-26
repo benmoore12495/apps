@@ -371,6 +371,21 @@
       </div>
     </div>
 
+    <!-- Player lookup -->
+    <div style="margin-bottom:28px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <h2 style="font-size:1rem;font-weight:700;color:#a78bfa">Player Raw Data</h2>
+        <input id="debug-player-event" placeholder="Event ID e.g. 401811947" style="padding:6px 10px;background:#1c1f26;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#e8e8e8;font-size:0.85rem;width:180px" value="401811947"/>
+        <input id="debug-player-name" placeholder="Player name e.g. aberg" style="padding:6px 10px;background:#1c1f26;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#e8e8e8;font-size:0.85rem;width:180px" value="aberg"/>
+        <button onclick="probePlayer()" style="padding:6px 14px;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Lookup</button>
+        <button onclick="probeAllPlayers()" style="padding:6px 14px;background:#4c1d95;color:#fff;border:none;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer">Dump All</button>
+      </div>
+      <div style="font-size:0.75rem;color:#6b7280;margin-bottom:10px">Shows raw ESPN status fields for a player — or dumps every player's status/score/period if you click Dump All</div>
+      <div id="debug-player" style="background:#0d0f14;border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:14px;font-size:0.8rem;font-family:monospace;color:#c4b5fd;white-space:pre-wrap;max-height:500px;overflow:auto">
+        Enter event ID + partial player name and click Lookup…
+      </div>
+    </div>
+
     <!-- Event ID tester -->
     <div style="margin-bottom:28px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -504,6 +519,79 @@ function switchTab(id) {
 // ─────────────────────────────────────────────────────────────────────────────
 function debugOut(elId, text) {
   document.getElementById(elId).textContent = text;
+}
+
+async function probePlayer() {
+  const eventId = document.getElementById("debug-player-event").value.trim();
+  const search  = document.getElementById("debug-player-name").value.trim().toLowerCase();
+  debugOut("debug-player", `Fetching event ${eventId}, looking for "${search}"…`);
+
+  try {
+    const resp = await fetch(`${ESPN_BASE}&event=${eventId}`, { cache: "no-store" });
+    const data = await resp.json();
+    const comps = data?.events?.[0]?.competitions?.[0]?.competitors ?? [];
+
+    const matches = comps.filter(c =>
+      (c?.athlete?.displayName ?? "").toLowerCase().includes(search)
+    );
+
+    if (!matches.length) {
+      debugOut("debug-player", `No player found matching "${search}" in ${comps.length} competitors.\n\nAll names:\n` +
+        comps.map(c => c?.athlete?.displayName).join("\n"));
+      return;
+    }
+
+    const lines = matches.map(c => {
+      const name     = c?.athlete?.displayName;
+      const score    = c?.score?.displayValue;
+      const statusId = c?.status?.type?.id;
+      const statusNm = c?.status?.type?.name;
+      const period   = c?.status?.period;
+      const thru     = c?.status?.displayValue;
+      return `Name:      ${name}
+score.displayValue: ${score}
+status.type.id:     ${statusId}
+status.type.name:   ${statusNm}
+status.period:      ${period}
+status.displayValue:${thru}
+
+--- Full status object ---
+${JSON.stringify(c?.status, null, 2)}
+
+--- Full score object ---
+${JSON.stringify(c?.score, null, 2)}`;
+    });
+
+    debugOut("debug-player", lines.join("\n\n=====\n\n"));
+  } catch(e) {
+    debugOut("debug-player", "ERROR: " + e.message);
+  }
+}
+
+async function probeAllPlayers() {
+  const eventId = document.getElementById("debug-player-event").value.trim();
+  debugOut("debug-player", `Dumping all players for event ${eventId}…`);
+
+  try {
+    const resp = await fetch(`${ESPN_BASE}&event=${eventId}`, { cache: "no-store" });
+    const data = await resp.json();
+    const comps = data?.events?.[0]?.competitions?.[0]?.competitors ?? [];
+
+    const header = `${"Name".padEnd(28)} ${"Score".padEnd(8)} ${"statusId".padEnd(10)} ${"statusName".padEnd(20)} ${"period".padEnd(8)} thru`;
+    const rows = comps.map(c => {
+      const name  = (c?.athlete?.displayName ?? "?").padEnd(28);
+      const score = (c?.score?.displayValue ?? "?").padEnd(8);
+      const sid   = (c?.status?.type?.id ?? "?").padEnd(10);
+      const snm   = (c?.status?.type?.name ?? "?").padEnd(20);
+      const per   = String(c?.status?.period ?? "?").padEnd(8);
+      const thru  = c?.status?.displayValue ?? "?";
+      return `${name} ${score} ${sid} ${snm} ${per} ${thru}`;
+    });
+
+    debugOut("debug-player", `${comps.length} competitors:\n\n${header}\n${"─".repeat(90)}\n${rows.join("\n")}`);
+  } catch(e) {
+    debugOut("debug-player", "ERROR: " + e.message);
+  }
 }
 
 async function probeScoreboard() {
