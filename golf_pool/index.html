@@ -383,10 +383,10 @@ const CONTESTANTS = [
 // TOURNAMENT CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 const TOURNAMENTS = [
-  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",   complete: true  },
-  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Champ.", complete: true  },
-  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",   complete: false },
-  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",  complete: false },
+  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",    displayDate: "April 9–13, 2026",  complete: true  },
+  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Champ.", displayDate: "May 14–17, 2026",   complete: true  },
+  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",    displayDate: "June 18–21, 2026",  complete: false },
+  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",   displayDate: "July 17–20, 2026",  complete: false },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -497,10 +497,10 @@ function buildTournamentData(t) {
   const playerMap = {};
 
   for (const [key, score] of Object.entries(hc.scores)) {
-    playerMap[key] = { displayName: key, score, madecut: true, missedCut: false };
+    playerMap[norm(key)] = { displayName: key, score, madecut: true, missedCut: false };
   }
   for (const key of hc.mc) {
-    playerMap[key] = { displayName: key, score: hc.mcPenalty, madecut: false, missedCut: true };
+    playerMap[norm(key)] = { displayName: key, score: hc.mcPenalty, madecut: false, missedCut: true };
   }
 
   return {
@@ -631,7 +631,7 @@ function renderTournament(t) {
       <div class="tournament-header">
         <div>
           <div class="tournament-title">${t.name}</div>
-          <div class="tournament-meta">Starts ${formatDate(t.dates)}</div>
+          <div class="tournament-meta">Starts ${t.displayDate}</div>
         </div>
         <span class="status-pill upcoming">Upcoming</span>
       </div>
@@ -711,7 +711,7 @@ function renderTournament(t) {
     <div class="tournament-header">
       <div>
         <div class="tournament-title">${eventName || t.name}</div>
-        <div class="tournament-meta">${formatDate(t.dates)}</div>
+        <div class="tournament-meta">${t.displayDate}</div>
       </div>
       <span class="status-pill ${statusCls}">${statusLabel}</span>
     </div>
@@ -729,18 +729,6 @@ function renderTournament(t) {
       </thead>
       <tbody>${pickRows}</tbody>
     </table>`;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UTILITY
-// ─────────────────────────────────────────────────────────────────────────────
-function formatDate(dateStr) {
-  // dateStr like "20260409"
-  const y = dateStr.slice(0, 4);
-  const m = dateStr.slice(4, 6);
-  const d = dateStr.slice(6, 8);
-  const dt = new Date(`${y}-${m}-${d}`);
-  return dt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
