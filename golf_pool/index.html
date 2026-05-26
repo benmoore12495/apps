@@ -384,13 +384,34 @@ const CONTESTANTS = [
 // TOURNAMENT CONFIG
 // ─────────────────────────────────────────────────────────────────────────────
 const TOURNAMENTS = [
-  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",          dates: "20260409",  espnMatch: ["Masters Tournament","The Masters"],           complete: true  },
-  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Championship", dates: "20260515",  espnMatch: ["PGA Championship"],                           complete: true  },
-  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",          dates: "20260618",  espnMatch: ["U.S. Open","US Open","United States Open"],   complete: false },
-  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",         dates: "20260717",  espnMatch: ["The Open Championship","British Open"],       complete: false },
+  { id: "masters", key: "masters", name: "Masters Tournament",    shortName: "Masters",
+    espnMatch: ["Masters Tournament","The Masters","masters tournament"],
+    tryDates: ["20260413","20260412","20260411","20260410","20260409"],
+    tryNoLeague: true,   // Masters is not PGA Tour sanctioned — try without league param too
+    tryCurrentEvent: false,
+    complete: true  },
+  { id: "pga",     key: "pga",     name: "PGA Championship",      shortName: "PGA Championship",
+    espnMatch: ["PGA Championship"],
+    tryDates: ["20260517","20260516","20260515","20260514"],
+    tryNoLeague: false,
+    tryCurrentEvent: true,  // Most recent completed event — try no-date param first
+    complete: true  },
+  { id: "usopen",  key: "usopen",  name: "U.S. Open",             shortName: "US Open",
+    espnMatch: ["U.S. Open","US Open","United States Open"],
+    tryDates: [],
+    tryNoLeague: false,
+    tryCurrentEvent: false,
+    complete: false },
+  { id: "theopen", key: "theopen", name: "The Open Championship", shortName: "The Open",
+    espnMatch: ["The Open Championship","British Open"],
+    tryDates: [],
+    tryNoLeague: false,
+    tryCurrentEvent: false,
+    complete: false },
 ];
 
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+const ESPN_BASE    = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
+const ESPN_NOLEG   = "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard";
 
 // Cache: tournamentId → { playerMap, worstMadeCutScore, eventName, isLive, isComplete }
 const cache = {};
@@ -426,41 +447,21 @@ function switchTab(id) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ESPN FETCH
 // ─────────────────────────────────────────────────────────────────────────────
-async function fetchTournament(t) {
-  const url = `${ESPN_BASE}&dates=${t.dates}`;
-  const resp = await fetch(url, { cache: "no-store" });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-  const data = await resp.json();
 
-  const events = data?.events ?? [];
+function nameMatchesMajor(espnName, t) {
+  const n = (espnName ?? "").toLowerCase();
+  return t.espnMatch.some(m => n.includes(m.toLowerCase()));
+}
 
-  // Find the event matching this major by name
-  let event = null;
-  for (const ev of events) {
-    const ename = ev?.name ?? ev?.shortName ?? "";
-    if (t.espnMatch.some(m => ename.toLowerCase().includes(m.toLowerCase()))) {
-      event = ev;
-      break;
-    }
-  }
-  // Fallback: first event with competitors
-  if (!event && events.length > 0) {
-    event = events.find(ev => (ev?.competitions?.[0]?.competitors?.length ?? 0) > 0) ?? events[0];
-  }
-
+function processEvent(event, t) {
   const competitors = event?.competitions?.[0]?.competitors ?? [];
   const eventName   = event?.name ?? t.name;
-
-  // Determine if tournament is live or complete from ESPN status
   const compStatus  = event?.competitions?.[0]?.status?.type?.id ?? "";
-  // ESPN: 1=scheduled, 2=in-progress, 3=final
-  const isLive     = compStatus === "2";
-  const isComplete = compStatus === "3";
+  const isLive      = compStatus === "2";
+  const isComplete  = compStatus === "3";
 
-  // Build player map
-  const playerMap = {};
-  // Track players who completed 4 rounds with their to-par score
-  const madeCutScores = [];
+  const playerMap      = {};
+  const madeCutScores  = [];
 
   for (const comp of competitors) {
     const displayName = comp?.athlete?.displayName ?? "";
@@ -469,25 +470,57 @@ async function fetchTournament(t) {
     const thru        = comp?.status?.displayValue ?? "–";
     const statusId    = comp?.status?.type?.id ?? "";
 
-    const score = rawScore === "E" ? 0 : parseInt(rawScore, 10);
+    const score      = rawScore === "E" ? 0 : parseInt(rawScore, 10);
+    const missedCut  = statusId === "6";
+    const madecut    = !missedCut && (period >= 4 || (isComplete && statusId === "3"));
 
-    // Made cut = completed 4 rounds (period 4) or status "final" in a complete tournament
-    const madecut = period >= 4 || (isComplete && statusId === "3");
-    const missedCut = statusId === "6"; // ESPN cut status
-
-    if (madecut && !missedCut) {
-      madeCutScores.push(score);
-    }
+    if (madecut) madeCutScores.push(score);
 
     playerMap[norm(displayName)] = { displayName, score, period, thru, madecut, missedCut };
   }
 
-  // Worst score among those who made the cut (the MC penalty)
-  const worstMadeCutScore = madeCutScores.length > 0
-    ? Math.max(...madeCutScores)
-    : null;
-
+  const worstMadeCutScore = madeCutScores.length > 0 ? Math.max(...madeCutScores) : null;
   return { playerMap, worstMadeCutScore, eventName, isLive, isComplete };
+}
+
+async function tryFetchEvent(url, t) {
+  try {
+    const resp = await fetch(url, { cache: "no-store" });
+    if (!resp.ok) return null;
+    const data  = await resp.json();
+    const events = data?.events ?? [];
+    for (const ev of events) {
+      const ename = (ev?.name ?? "") + " " + (ev?.shortName ?? "");
+      if (nameMatchesMajor(ename, t)) return processEvent(ev, t);
+    }
+  } catch {}
+  return null;
+}
+
+async function fetchTournament(t) {
+  if (!t.complete) return null; // Upcoming — nothing to fetch yet
+
+  // Build list of URLs to try in priority order
+  const urls = [];
+
+  // 1. For PGA: try no-date endpoint first (most recent completed event)
+  if (t.tryCurrentEvent) {
+    urls.push(ESPN_BASE);
+  }
+
+  // 2. Try each date within the tournament week (final round first)
+  for (const d of t.tryDates) {
+    urls.push(`${ESPN_BASE}&dates=${d}`);
+    // For Masters: also try without league restriction
+    if (t.tryNoLeague) urls.push(`${ESPN_NOLEG}?dates=${d}`);
+  }
+
+  for (const url of urls) {
+    const result = await tryFetchEvent(url, t);
+    if (result) return result;
+  }
+
+  return null; // Tournament data not available
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -636,8 +669,14 @@ function renderTournament(t) {
   }
 
   if (!tData) {
-    // Loading
-    container.innerHTML = `<div style="text-align:center;padding:60px;color:#6b7280">Loading scores…</div>`;
+    container.innerHTML = `
+      <div class="tournament-header">
+        <div><div class="tournament-title">${t.name}</div></div>
+        <span class="status-pill upcoming">Unavailable</span>
+      </div>
+      <div style="text-align:center;padding:60px;color:#6b7280;font-size:0.9rem">
+        Could not load ESPN scores for this tournament.<br>Try refreshing.
+      </div>`;
     return;
   }
 
