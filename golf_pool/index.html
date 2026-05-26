@@ -449,26 +449,26 @@
 // PICKS DATA  (3 players per contestant per major)
 // ─────────────────────────────────────────────────────────────────────────────
 const CONTESTANTS = [
-  { name: "Mo Swann",      picks: { masters: ["Scottie Scheffler","Xander Schauffele","Colin Morikawa"],    pga: ["Ludvig Aberg","Si Woo Kim","Matt Fitzpatrick"],         usopen: ["Bryson DeChambeau","Ryan Gerard","Justin Rose"],          theopen: ["Rory McIlroy","Cameron Young","Tommy Fleetwood"] }},
-  { name: "Geoff Barsch",  picks: { masters: ["Scottie Scheffler","Jon Rahm","Justin Rose"],                pga: ["Ludvig Aberg","Rory McIlroy","Xander Schauffele"],       usopen: ["Bryson DeChambeau","Collin Morikawa","Cameron Young"],     theopen: ["Matt Fitzpatrick","Victor Hovland","Tommy Fleetwood"] }},
+  { name: "Mo Swann",      picks: { masters: ["Scottie Scheffler","Xander Schauffele","Collin Morikawa"],    pga: ["Ludvig Aberg","Si Woo Kim","Matt Fitzpatrick"],         usopen: ["Bryson DeChambeau","Ryan Gerard","Justin Rose"],          theopen: ["Rory McIlroy","Cameron Young","Tommy Fleetwood"] }},
+  { name: "Geoff Barsch",  picks: { masters: ["Scottie Scheffler","Jon Rahm","Justin Rose"],                pga: ["Ludvig Aberg","Rory McIlroy","Xander Schauffele"],       usopen: ["Bryson DeChambeau","Collin Morikawa","Cameron Young"],     theopen: ["Matt Fitzpatrick","Viktor Hovland","Tommy Fleetwood"] }},
   { name: "Brian Swann",   picks: { masters: ["Justin Rose","Ludvig Aberg","Xander Schauffele"],            pga: ["Scottie Scheffler","Hideki Matsuyama","Cameron Young"],   usopen: ["Matt Fitzpatrick","Tommy Fleetwood","Jon Rahm"],           theopen: ["Rory McIlroy","Tommy Fleetwood","Robert MacIntyre"] }},
-  { name: "Jen Lynch",     picks: { masters: ["Scottie Scheffler","Cameron Young","Xander Schauffele"],     pga: ["Rory McIlroy","Victor Hovland","Justin Rose"],            usopen: ["Collin Morikawa","Ludvig Aberg","Chris Gotterup"],         theopen: ["Ben Griffin","Matt Fitzpatrick","Tommy Fleetwood"] }},
-  { name: "Dr. Kristin Moore", picks: { masters: ["Rory McIlroy","Scottie Scheffler","Xander Schauffele"], pga: ["Jordan Spieth","Hideki Matsuyama","Wyndham Clark"],       usopen: ["Victor Hovland","Collin Morikawa","Rickie Fowler"],        theopen: ["Tommy Fleetwood","Ludvig Aberg","Justin Thomas"] }},
+  { name: "Jen Lynch",     picks: { masters: ["Scottie Scheffler","Cameron Young","Xander Schauffele"],     pga: ["Rory McIlroy","Viktor Hovland","Justin Rose"],            usopen: ["Collin Morikawa","Ludvig Aberg","Chris Gotterup"],         theopen: ["Ben Griffin","Matt Fitzpatrick","Tommy Fleetwood"] }},
+  { name: "Dr. Kristin Moore", picks: { masters: ["Rory McIlroy","Scottie Scheffler","Xander Schauffele"], pga: ["Jordan Spieth","Hideki Matsuyama","Wyndham Clark"],       usopen: ["Viktor Hovland","Collin Morikawa","Rickie Fowler"],        theopen: ["Tommy Fleetwood","Ludvig Aberg","Justin Thomas"] }},
   { name: "Joe O'Leary",   picks: { masters: ["Cameron Young","Xander Schauffele","Rory McIlroy"],          pga: ["Ludvig Aberg","Collin Morikawa","Jacob Bridgeman"],       usopen: ["Scottie Scheffler","Bryson DeChambeau","Jon Rahm"],        theopen: ["Min Woo Lee","Matt Fitzpatrick","Tommy Fleetwood"] }},
   { name: "Sam Engelbert", picks: { masters: ["Ludvig Aberg","Jon Rahm","Patrick Reed"],                    pga: ["Xander Schauffele","Scottie Scheffler","Cameron Young"],  usopen: ["Robert MacIntyre","Tommy Fleetwood","Matt Fitzpatrick"],   theopen: ["Shane Lowry","Tyrrell Hatton","Chris Gotterup"] }},
   { name: "Ben Engelbert", picks: { masters: ["Hideki Matsuyama","Jon Rahm","Jordan Spieth"],               pga: ["Scottie Scheffler","Collin Morikawa","Xander Schauffele"],usopen: ["Bryson DeChambeau","Rory McIlroy","Matt Fitzpatrick"],     theopen: ["Shane Lowry","Ludvig Aberg","Tommy Fleetwood"] }},
-  { name: "Dan Queen",     picks: { masters: ["Rory McIlroy","Xander Schauffele","Scottie Scheffler"],      pga: ["Brooks Koepka","Victor Hovland","Cameron Young"],         usopen: ["Ludvig Aberg","Matt Fitzpatrick","Collin Morikawa"],       theopen: ["Tommy Fleetwood","Robert MacIntyre","Shane Lowry"] }},
-  { name: "Frank Swann",   picks: { masters: ["Scottie Scheffler","Xander Schauffele","Justin Rose"],       pga: ["Rory McIlroy","Victor Hovland","Collin Morikawa"],        usopen: ["Jon Rahm","Bryson DeChambeau","Matt Fitzpatrick"],         theopen: ["Russell Henley","Tommy Fleetwood","Ludvig Aberg"] }},
+  { name: "Dan Queen",     picks: { masters: ["Rory McIlroy","Xander Schauffele","Scottie Scheffler"],      pga: ["Brooks Koepka","Viktor Hovland","Cameron Young"],         usopen: ["Ludvig Aberg","Matt Fitzpatrick","Collin Morikawa"],       theopen: ["Tommy Fleetwood","Robert MacIntyre","Shane Lowry"] }},
+  { name: "Frank Swann",   picks: { masters: ["Scottie Scheffler","Xander Schauffele","Justin Rose"],       pga: ["Rory McIlroy","Viktor Hovland","Collin Morikawa"],        usopen: ["Jon Rahm","Bryson DeChambeau","Matt Fitzpatrick"],         theopen: ["Russell Henley","Tommy Fleetwood","Ludvig Aberg"] }},
   { name: "Ben Moore",     picks: { masters: ["Matt Fitzpatrick","Bryson DeChambeau","Cameron Young"],      pga: ["Jon Rahm","Collin Morikawa","Ludvig Aberg"],              usopen: ["Scottie Scheffler","Brooks Koepka","Joaquin Niemann"],     theopen: ["Xander Schauffele","Rory McIlroy","Tommy Fleetwood"] }},
   { name: "Connor Munion", picks: { masters: ["Chris Gotterup","Justin Rose","Akshay Bhatia"],              pga: ["Min Woo Lee","Matt Fitzpatrick","Xander Schauffele"],     usopen: ["Scottie Scheffler","Cameron Young","Collin Morikawa"],     theopen: ["Rory McIlroy","Ludvig Aberg","Tommy Fleetwood"] }},
   { name: "Jeanie Engelbert", picks: { masters: ["Ludvig Aberg","Scottie Scheffler","Cameron Young"],      pga: ["Jacob Bridgeman","Collin Morikawa","Chris Gotterup"],     usopen: ["Akshay Bhatia","Xander Schauffele","Bryson DeChambeau"],   theopen: ["Rory McIlroy","Robert MacIntyre","Tommy Fleetwood"] }},
-  { name: "Phil Swann",    picks: { masters: ["Ludvig Aberg","Colin Morikawa","Patrick Reed"],              pga: ["Bryson DeChambeau","Hideki Matsuyama","Xander Schauffele"],usopen: ["Scottie Scheffler","Cameron Young","Jon Rahm"],           theopen: ["Rory McIlroy","Justin Rose","Matt Fitzpatrick"] }},
-  { name: "Carolyn Moore", picks: { masters: ["Rory McIlroy","Scottie Scheffler","Tommy Fleetwood"],        pga: ["Cameron Young","Brooks Koepka","Bryson DeChambeau"],      usopen: ["Victor Hovland","Sam Burns","Xander Schauffele"],          theopen: ["Collin Morikawa","Ludvig Aberg","Matt Fitzpatrick"] }},
+  { name: "Phil Swann",    picks: { masters: ["Ludvig Aberg","Collin Morikawa","Patrick Reed"],              pga: ["Bryson DeChambeau","Hideki Matsuyama","Xander Schauffele"],usopen: ["Scottie Scheffler","Cameron Young","Jon Rahm"],           theopen: ["Rory McIlroy","Justin Rose","Matt Fitzpatrick"] }},
+  { name: "Carolyn Moore", picks: { masters: ["Rory McIlroy","Scottie Scheffler","Tommy Fleetwood"],        pga: ["Cameron Young","Brooks Koepka","Bryson DeChambeau"],      usopen: ["Viktor Hovland","Sam Burns","Xander Schauffele"],          theopen: ["Collin Morikawa","Ludvig Aberg","Matt Fitzpatrick"] }},
   { name: "Collin Sasaki", picks: { masters: ["Ludvig Aberg","Tony Finau","Patrick Cantlay"],               pga: ["Justin Thomas","Jon Rahm","Bryson DeChambeau"],           usopen: ["Brooks Koepka","Rory McIlroy","Xander Schauffele"],        theopen: ["Shane Lowry","Scottie Scheffler","Tommy Fleetwood"] }},
-  { name: "Patrick Tulley",picks: { masters: ["Rory McIlroy","Jon Rahm","Matt McCarty"],                    pga: ["Brooks Koepka","Patrick Cantlay","Justin Thomas"],        usopen: ["Scottie Scheffler","Ludvig Aberg","Victor Hovland"],       theopen: ["JJ Spaun","Xander Schauffele","Shane Lowry"] }},
-  { name: "Mike Garland",  picks: { masters: ["Scottie Scheffler","Will Zalatoris","Patrick Cantlay"],      pga: ["Rory McIlroy","Victor Hovland","Collin Morikawa"],        usopen: ["Brooks Koepka","Jon Rahm","Matt Fitzpatrick"],             theopen: ["Ludvig Aberg","Cameron Smith","Tommy Fleetwood"] }},
+  { name: "Patrick Tulley",picks: { masters: ["Rory McIlroy","Jon Rahm","Matt McCarty"],                    pga: ["Brooks Koepka","Patrick Cantlay","Justin Thomas"],        usopen: ["Scottie Scheffler","Ludvig Aberg","Viktor Hovland"],       theopen: ["JJ Spaun","Xander Schauffele","Shane Lowry"] }},
+  { name: "Mike Garland",  picks: { masters: ["Scottie Scheffler","Will Zalatoris","Patrick Cantlay"],      pga: ["Rory McIlroy","Viktor Hovland","Collin Morikawa"],        usopen: ["Brooks Koepka","Jon Rahm","Matt Fitzpatrick"],             theopen: ["Ludvig Aberg","Cameron Smith","Tommy Fleetwood"] }},
   { name: "Darcy Garland", picks: { masters: ["Sam Burns","JJ Spaun","Ben Griffin"],                        pga: ["Jacob Bridgeman","Ryan Gerard","Justin Rose"],            usopen: ["Scottie Scheffler","Russell Henley","Max McGreevy"],       theopen: ["Cameron Young","Rory McIlroy","Collin Morikawa"] }},
-  { name: "Russ Engelbert",picks: { masters: ["Cameron Young","Will Zalatoris","Patrick Cantlay"],          pga: ["Victor Hovland","Tony Finau","Sahith Theegala"],          usopen: ["Si Woo Kim","Russell Henley","Corey Conners"],             theopen: ["Min Woo Lee","Tyrrell Hatton","Robert MacIntyre"] }},
+  { name: "Russ Engelbert",picks: { masters: ["Cameron Young","Will Zalatoris","Patrick Cantlay"],          pga: ["Viktor Hovland","Tony Finau","Sahith Theegala"],          usopen: ["Si Woo Kim","Russell Henley","Corey Conners"],             theopen: ["Min Woo Lee","Tyrrell Hatton","Robert MacIntyre"] }},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,7 +490,14 @@ const cache = {};
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function norm(n) {
-  return (n ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  // NFD splits e.g. Å into A + combining ring above (U+030A).
+  // \p{M} matches all Unicode mark characters (combining diacritics).
+  // Result: Åberg→aberg, Joaquín→joaquin, Højgaard→hojgaard, etc.
+  return (n ?? "")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z]/g, "");
 }
 
 function fmtScore(n) {
@@ -753,8 +760,8 @@ function getPlayerScore(playerName, playerMap, worstMadeCutScore) {
   const data = playerMap[key];
 
   if (!data) {
-    // Not in our score table — treat as MC
-    return { score: worstMadeCutScore, mc: true, displayName: playerName };
+    // Not found in ESPN data — show -99 as a sentinel so it's visible in UI
+    return { score: -99, mc: false, notFound: true, displayName: playerName };
   }
 
   if (data.missedCut) {
