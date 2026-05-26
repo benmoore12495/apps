@@ -490,12 +490,9 @@ const cache = {};
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function norm(n) {
-  // NFD splits e.g. Å into A + combining ring above (U+030A).
-  // \p{M} matches all Unicode mark characters (combining diacritics).
-  // Result: Åberg→aberg, Joaquín→joaquin, Højgaard→hojgaard, etc.
   return (n ?? "")
     .normalize("NFD")
-    .replace(/\p{M}/gu, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z]/g, "");
 }
