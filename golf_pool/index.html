@@ -777,7 +777,7 @@ function getPlayerScore(playerName, playerMap, worstMadeCutScore, tourneyKey) {
   const data = playerMap[key];
 
   if (!data) {
-    return { score: -99, mc: false, notFound: true, displayName: playerName };
+    return { score: 0, mc: false, notFound: true, displayName: playerName };
   }
 
   if (data.missedCut) {
@@ -929,7 +929,7 @@ function renderTournament(t) {
     const rankCls = rank === 1 ? "top1" : rank <= 3 ? "top3" : "";
 
     const pickCells = row.pickResults.map((r, pi) => {
-      const sc   = r.score !== null && r.score !== undefined ? r.score : null;
+      const sc   = r.notFound ? null : r.score;
       const cls  = scoreClass(sc);
       const mcCls = r.mc ? " mc" : "";
       const lastName = r.displayName ? r.displayName.split(" ").slice(-1)[0] : row.picks[pi].split(" ").slice(-1)[0];
