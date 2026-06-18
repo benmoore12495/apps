@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PGA Championship 2026 – Pick'em</title>
+  <title>US Open 2026 – Pick'em</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -284,7 +284,7 @@
 <body>
 
 <header class="site-header">
-  <h1>PGA Championship 2026</h1>
+  <h1>US Open 2026</h1>
   <p class="subtitle">Pick'em Score Comparison</p>
   <p class="last-updated" id="lastUpdated">–</p>
   <br>
@@ -396,22 +396,19 @@
 <script>
   // ── Picks (use full ESPN display names) ──────────────────────────────────
   const PICKS = {
-    ben:    ["Scottie Scheffler", "Xander Schauffele", "Shane Lowry", "Joaquin Niemann", "Cameron Young"],
-    andrew: ["Patrick Reed", "Brooks Koepka", "Jon Rahm", "Justin Thomas", "Jordan Spieth"]
+    ben:    ["Jon Rahm", "Rory McIlroy", "Cameron Young", "Ludvig Aberg", "Xander Schauffele"],
+    andrew: ["Scottie Scheffler", "Matt Fitzpatrick", "Tommy Fleetwood", "Bryson DeChambeau", "Viktor Hovland"]
   };
 
   // ESPN treats "Cam Young" as "Cameron Young" — add any other aliases here
   const NAME_ALIASES = {
     "cam young": "cameron young",
-    "joaquin niemann": "joaquin niemann"  // normalized from "Joaquín"
+    "matty fitz": "matt fitzpatrick"
   };
 
-  // Try multiple ESPN endpoints — PGA Championship is served under its own
-  // league code separate from regular PGA Tour events.
+  // US Open 2026 — event ID 401811952
   const ESPN_URLS = [
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pgachampionship",
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga",
-    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=mens-pgachampionship",
+    "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=401811952",
   ];
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -503,10 +500,10 @@
     const map = {};
     const events = data?.events ?? [];
 
-    // Prefer the event whose name contains "PGA Championship"; fall back to
+    // Prefer the event whose name contains "U.S. Open"; fall back to
     // whichever event has the most competitors.
-    const isPGA = ev => /pga championship/i.test(ev?.name ?? "") ||
-                        /pga championship/i.test(ev?.shortName ?? "");
+    const isPGA = ev => /u\.?s\.? open/i.test(ev?.name ?? "") ||
+                        /u\.?s\.? open/i.test(ev?.shortName ?? "");
     const pgaEv = events.find(isPGA);
     const targetEv = pgaEv ?? events.reduce(
       (best, ev) => {
