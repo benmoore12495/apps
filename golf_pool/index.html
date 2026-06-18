@@ -739,7 +739,10 @@ function processEvent(event) {
 
     const parsed    = parseInt(rawScore, 10);
     const score     = (rawScore === "E" || isNaN(parsed)) ? 0 : parsed;
-    const missedCut = statusId === "6";
+    const statusName = (comp?.status?.type?.name ?? "").toLowerCase();
+    const missedCut = statusId === "6"
+      || statusName.includes("cut")
+      || (isComplete && period > 0 && period <= 2);
     const madecut   = !missedCut && period >= 3;
 
     if (madecut) madeCutScores.push(score);
