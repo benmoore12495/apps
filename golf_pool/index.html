@@ -725,12 +725,19 @@ function processEvent(event) {
 
   for (const comp of competitors) {
     const displayName = comp?.athlete?.displayName ?? "";
-    const rawScore    = comp?.score?.displayValue ?? "E";
+    const scoreStat = comp?.statistics?.find(
+      s => s.name?.toLowerCase().replace(/\s/g, "") === "scoretopar"
+    );
+    const rawScore =
+      scoreStat?.displayValue ??
+      comp?.status?.score?.displayValue ??
+      comp?.score?.displayValue ??
+      "E";
     const period      = comp?.status?.period ?? 0;
     const thru        = comp?.status?.displayValue ?? "–";
     const statusId    = comp?.status?.type?.id ?? "";
 
-    const score     = rawScore === "E" ? 0 : parseInt(rawScore, 10);
+    const score     = (rawScore === "E" || rawScore === "0") ? 0 : parseInt(rawScore, 10);
     const missedCut = statusId === "6";
     const madecut   = !missedCut && period >= 3;
 
