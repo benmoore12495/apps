@@ -737,7 +737,8 @@ function processEvent(event) {
     const thru        = comp?.status?.displayValue ?? "–";
     const statusId    = comp?.status?.type?.id ?? "";
 
-    const score     = (rawScore === "E" || rawScore === "0") ? 0 : parseInt(rawScore, 10);
+    const parsed    = parseInt(rawScore, 10);
+    const score     = (rawScore === "E" || isNaN(parsed)) ? 0 : parsed;
     const missedCut = statusId === "6";
     const madecut   = !missedCut && period >= 3;
 
