@@ -493,12 +493,12 @@
       "E";
     const score = (rawScore === "E" || rawScore === "0") ? 0 : parseInt(rawScore, 10);
 
-    const currentRound =
+    const period =
       comp?.status?.currentRound ??
       comp?.status?.period ??
       comp?.linescores?.length ??
       0;
-    const round = (currentRound >= 1 && currentRound <= 4) ? `R${currentRound}` : "–";
+    const round = (period >= 1 && period <= 4) ? `R${period}` : "–";
 
     const thruRaw = comp?.status?.thru ?? -1;
     let thru = "–";
@@ -506,60 +506,71 @@
     else if (thruRaw >= 1 && thruRaw <= 17)      thru = String(thruRaw);
     // thruRaw === 0 means not yet started → leave as "–"
 
-    // Same missed-cut detection as the golf pool app (status.type.id === "6")
-    // Note: override may be set in buildPlayerMap via linescores approach
-    const missedCut = comp?.status?.type?.id === "6";
+    // Missed-cut detection, copied from the golf_pool app: ESPN tags cut
+    // players with status.type.id === "6". (period-based backstop added
+    // in buildPlayerMap once we know how far the field has advanced.)
+    const statusId   = comp?.status?.type?.id ?? "";
+    const statusName = (comp?.status?.type?.name ?? "").toLowerCase();
+    const missedCut  = statusId === "6" || statusName.includes("cut");
 
-    return { score, round, thru, missedCut, linescoreCount: comp?.linescores?.length ?? 0 };
+    return { score, round, thru, missedCut, statusId, statusName, period };
   }
+
+  // US Open 2026 ESPN event ID (matches the &event= param in ESPN_URLS)
+  const US_OPEN_EVENT_ID = "401811952";
 
   // ── Build name → data map from ESPN response ─────────────────────────────
   function buildPlayerMap(data) {
     const map = {};
     const events = data?.events ?? [];
 
-    // Prefer the event whose name contains "U.S. Open"; fall back to
-    // whichever event has the most competitors.
-    const isPGA = ev => /u\.?s\.? open/i.test(ev?.name ?? "") ||
-                        /u\.?s\.? open/i.test(ev?.shortName ?? "");
-    const pgaEv = events.find(isPGA);
-    const targetEv = pgaEv ?? events.reduce(
-      (best, ev) => {
+    // Select the event by ID first (exactly how the golf_pool app does it) so
+    // we never latch onto a stale/duplicate "U.S. Open" entry. Fall back to a
+    // name match, then to whichever event has the most competitors.
+    const isUSOpen = ev => /u\.?s\.? open/i.test(ev?.name ?? "") ||
+                           /u\.?s\.? open/i.test(ev?.shortName ?? "");
+    const targetEv =
+      events.find(ev => String(ev?.id) === US_OPEN_EVENT_ID) ??
+      events.find(isUSOpen) ??
+      events.reduce((best, ev) => {
         const n = ev?.competitions?.[0]?.competitors?.length ?? 0;
         return n > (best?.competitions?.[0]?.competitors?.length ?? 0) ? ev : best;
       }, null);
 
     const competitors = targetEv?.competitions?.[0]?.competitors ?? [];
 
-    // Players who completed only 2 rounds while the field is in R3+ missed the cut
-    const maxLinescores = competitors.reduce((max, c) => Math.max(max, c?.linescores?.length ?? 0), 0);
+    // Pre-parse everyone so we can learn how far the field has advanced.
+    const parsedList = competitors.map(comp => ({
+      comp,
+      displayName: comp?.athlete?.displayName ?? "",
+      parsed: parseCompetitor(comp),
+    }));
+
+    // Period-based backstop: once the field is into R3+, anyone who never got
+    // past R2 (and isn't already flagged) missed the cut.
+    const maxPeriod = parsedList.reduce((m, p) => Math.max(m, p.parsed.period ?? 0), 0);
 
     const debugRows = [];
 
-    for (const comp of competitors) {
-      const displayName = comp?.athlete?.displayName ?? "";
+    for (const { comp, displayName, parsed } of parsedList) {
       if (!displayName) continue;
       const key = normalizeName(displayName);
-      const parsed = parseCompetitor(comp);
-      const missedCut = parsed.missedCut || (maxLinescores >= 3 && parsed.linescoreCount === 2);
+      const missedCut = parsed.missedCut || (maxPeriod >= 3 && parsed.period <= 2);
       map[key] = { displayName, ...parsed, missedCut };
       // Debug: capture raw ESPN fields for our picks
       const allPicks = ["rahm","mcilroy","young","aberg","schauffele","scheffler","fitzpatrick","fleetwood","dechambeau","hovland"];
       if (allPicks.some(p => key.includes(p))) {
         debugRows.push({
           name:                        displayName,
-          "score.displayValue":        comp?.score?.displayValue,
-          "status.score.displayValue": comp?.status?.score?.displayValue,
+          "score":                     parsed.score,
           "status.type.id":            comp?.status?.type?.id,
           "status.type.name":          comp?.status?.type?.name,
-          "status.currentRound":       comp?.status?.currentRound,
           "status.period":             comp?.status?.period,
+          "status.currentRound":       comp?.status?.currentRound,
           "status.thru":               comp?.status?.thru,
           "status.displayValue":       comp?.status?.displayValue,
-          "linescores.length":         comp?.linescores?.length,
+          "maxPeriod (field)":         maxPeriod,
           "missedCut":                 missedCut,
-          "statistics":                comp?.statistics?.map(s => `${s.name}:${s.displayValue}`),
-          "linescores":                comp?.linescores?.map(l => l.displayValue ?? l.value),
         });
       }
     }
