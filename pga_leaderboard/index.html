@@ -381,6 +381,14 @@
   const US_OPEN_URL =
     `https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=${US_OPEN_EVENT_ID}`;
 
+  // Hardcoded fallback – names here are always treated as missed cut
+  // regardless of what the ESPN API returns
+  const US_OPEN_MISSED_CUT_OVERRIDE = [
+    "Jon Rahm",
+    "Bryson DeChambeau",
+    "Viktor Hovland",
+  ];
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   function scoreNum(displayValue) {
     if (!displayValue || displayValue === "E") return 0;
@@ -422,25 +430,35 @@
       .replace(/[^a-z]/g, "");
   }
 
-  // ── Fetch US Open missed cuts (status.type.id === "6") ───────────────────
+  // ── Fetch US Open missed cuts ────────────────────────────────────────────
   async function fetchUSOpenMissedCuts() {
+    // Seed with the hardcoded override list so it always applies
+    const missedCuts = new Set(US_OPEN_MISSED_CUT_OVERRIDE.map(normalizeName));
+
     try {
       const resp = await fetch(US_OPEN_URL, { cache: "no-store" });
-      if (!resp.ok) return new Set();
+      if (!resp.ok) return missedCuts;
       const data = await resp.json();
-      const missedCuts = new Set();
       for (const ev of (data?.events ?? [])) {
         for (const comp of (ev?.competitions?.[0]?.competitors ?? [])) {
-          if (comp?.status?.type?.id === "6") {
+          const statusId   = comp?.status?.type?.id ?? "";
+          const statusName = (comp?.status?.type?.name ?? "").toLowerCase();
+          const dispVal    = (comp?.status?.displayValue ?? "").toUpperCase();
+          const isMC =
+            statusId === "6" ||
+            statusName === "cut" ||
+            statusName.includes("missed") ||
+            dispVal === "MC" ||
+            dispVal === "CUT";
+          if (isMC) {
             const name = comp?.athlete?.displayName ?? "";
             if (name) missedCuts.add(normalizeName(name));
           }
         }
       }
-      return missedCuts;
-    } catch {
-      return new Set();
-    }
+    } catch { /* ignore – return override list */ }
+
+    return missedCuts;
   }
 
   // ── Render skeleton rows while loading ───────────────────────────────────
