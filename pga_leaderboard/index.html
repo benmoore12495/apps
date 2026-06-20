@@ -181,20 +181,6 @@
       color: #9aa0ad;
     }
 
-    .mc-badge {
-      display: inline-block;
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.4);
-      border-radius: 4px;
-      padding: 1px 5px;
-      font-size: 0.65rem;
-      font-weight: 700;
-      color: #f87171;
-      margin-left: 6px;
-      vertical-align: middle;
-      letter-spacing: 0.04em;
-    }
-
     .skeleton {
       background: linear-gradient(90deg,
         rgba(255,255,255,0.04) 25%,
@@ -474,8 +460,15 @@
       </tr>`).join("");
   }
 
-  // ── Parse ESPN competitor into {score, round, thru, missedCut} ──────────
+  // ── Parse ESPN competitor into {score, round, thru} ─────────────────────
   function parseCompetitor(comp) {
+    // Primary paths (confirmed ESPN golf API structure):
+    //   score  → comp.status.score.displayValue
+    //   round  → comp.status.currentRound  (integer 1-4)
+    //   thru   → comp.status.thru          (integer 0-18; 0=not started, 18=finished)
+    // Fall back to legacy paths in case ESPN changes the shape again.
+
+    // Score: pull from statistics "score to par" entry — most up-to-date field
     const scoreStat = comp?.statistics?.find(
       s => s.name?.toLowerCase().replace(/\s/g, "") === "scoretopar"
     );
@@ -495,13 +488,11 @@
 
     const thruRaw = comp?.status?.thru ?? -1;
     let thru = "–";
-    if (thruRaw === 18)                     thru = "F";
-    else if (thruRaw >= 1 && thruRaw <= 17) thru = String(thruRaw);
+    if (thruRaw === 18)                          thru = "F";
+    else if (thruRaw >= 1 && thruRaw <= 17)      thru = String(thruRaw);
+    // thruRaw === 0 means not yet started → leave as "–"
 
-    // Same missed-cut detection used by the golf pool app
-    const missedCut = comp?.status?.type?.id === "6";
-
-    return { score, round, thru, missedCut };
+    return { score, round, thru };
   }
 
   // ── Build name → data map from ESPN response ─────────────────────────────
@@ -529,19 +520,16 @@
       const key = normalizeName(displayName);
       map[key] = { displayName, ...parseCompetitor(comp) };
       // Debug: capture raw ESPN fields for our picks
-      const allPicks = ["rahm","mcilroy","young","aberg","schauffele","scheffler","fitzpatrick","fleetwood","dechambeau","hovland"];
+      const allPicks = ["scheffler","schauffele","lowry","niemann","young","reed","koepka","rahm","thomas","spieth"];
       if (allPicks.some(p => key.includes(p))) {
         debugRows.push({
           name:                        displayName,
           "score.displayValue":        comp?.score?.displayValue,
           "status.score.displayValue": comp?.status?.score?.displayValue,
-          "status.type.id":            comp?.status?.type?.id,
-          "status.type.name":          comp?.status?.type?.name,
           "status.currentRound":       comp?.status?.currentRound,
           "status.period":             comp?.status?.period,
           "status.thru":               comp?.status?.thru,
           "status.displayValue":       comp?.status?.displayValue,
-          "missedCut":                 comp?.status?.type?.id === "6",
           "statistics":                comp?.statistics?.map(s => `${s.name}:${s.displayValue}`),
           "linescores":                comp?.linescores?.map(l => l.displayValue ?? l.value),
         });
@@ -571,11 +559,9 @@
       .map(name => {
         const key      = normalizeName(name);
         const data     = playerMap[key] ?? { score: 0, round: "–", thru: "–", missing: true };
-        const isMC     = data.missedCut ?? false;
-        const base     = isMC ? data.score * 2 : data.score;
-        const isLeader = !isMC && leadingScore !== null && data.score === leadingScore;
+        const isLeader = leadingScore !== null && data.score === leadingScore;
         const bonus    = isLeader ? LEADER_BONUS : 0;
-        return { name, data, isMC, isLeader, bonus, effective: base + bonus };
+        return { name, data, isLeader, bonus, effective: data.score + bonus };
       })
       .sort((a, b) => a.effective - b.effective);
 
@@ -596,9 +582,8 @@
     }
 
     document.getElementById(tbodyId).innerHTML = rows.map((r, i) => {
-      const displayScore = r.isMC ? r.data.score * 2 : r.data.score;
-      const sc      = formatScore(displayScore);
-      const cls     = scoreClass(displayScore);
+      const sc      = formatScore(r.data.score);
+      const cls     = scoreClass(r.data.score);
       const dropped = i === droppedIdx ? " dropped" : "";
       const leaderCls = r.isLeader ? " leader" : "";
       const leaderBadge = r.isLeader
@@ -607,12 +592,9 @@
       const bonusTag = r.isLeader
         ? `<span class="bonus-tag">−3 bonus</span>`
         : "";
-      const mcBadge = r.isMC
-        ? `<span class="mc-badge">MC×2</span>`
-        : "";
       return `
         <tr class="${dropped}${leaderCls}">
-          <td class="player-name">${r.name}${leaderBadge}${mcBadge}</td>
+          <td class="player-name">${r.name}${leaderBadge}</td>
           <td><span class="score-val ${cls}">${sc}</span>${bonusTag}</td>
           <td><span class="round-badge">${r.data.round}</span></td>
           <td>${r.data.thru}</td>
