@@ -506,10 +506,11 @@
     else if (thruRaw >= 1 && thruRaw <= 17)      thru = String(thruRaw);
     // thruRaw === 0 means not yet started → leave as "–"
 
-    // Same missed-cut detection as the golf pool app
+    // Same missed-cut detection as the golf pool app (status.type.id === "6")
+    // Note: override may be set in buildPlayerMap via linescores approach
     const missedCut = comp?.status?.type?.id === "6";
 
-    return { score, round, thru, missedCut };
+    return { score, round, thru, missedCut, linescoreCount: comp?.linescores?.length ?? 0 };
   }
 
   // ── Build name → data map from ESPN response ─────────────────────────────
@@ -529,24 +530,34 @@
       }, null);
 
     const competitors = targetEv?.competitions?.[0]?.competitors ?? [];
+
+    // Players who completed only 2 rounds while the field is in R3+ missed the cut
+    const maxLinescores = competitors.reduce((max, c) => Math.max(max, c?.linescores?.length ?? 0), 0);
+
     const debugRows = [];
 
     for (const comp of competitors) {
       const displayName = comp?.athlete?.displayName ?? "";
       if (!displayName) continue;
       const key = normalizeName(displayName);
-      map[key] = { displayName, ...parseCompetitor(comp) };
+      const parsed = parseCompetitor(comp);
+      const missedCut = parsed.missedCut || (maxLinescores >= 3 && parsed.linescoreCount === 2);
+      map[key] = { displayName, ...parsed, missedCut };
       // Debug: capture raw ESPN fields for our picks
-      const allPicks = ["scheffler","schauffele","lowry","niemann","young","reed","koepka","rahm","thomas","spieth"];
+      const allPicks = ["rahm","mcilroy","young","aberg","schauffele","scheffler","fitzpatrick","fleetwood","dechambeau","hovland"];
       if (allPicks.some(p => key.includes(p))) {
         debugRows.push({
           name:                        displayName,
           "score.displayValue":        comp?.score?.displayValue,
           "status.score.displayValue": comp?.status?.score?.displayValue,
+          "status.type.id":            comp?.status?.type?.id,
+          "status.type.name":          comp?.status?.type?.name,
           "status.currentRound":       comp?.status?.currentRound,
           "status.period":             comp?.status?.period,
           "status.thru":               comp?.status?.thru,
           "status.displayValue":       comp?.status?.displayValue,
+          "linescores.length":         comp?.linescores?.length,
+          "missedCut":                 missedCut,
           "statistics":                comp?.statistics?.map(s => `${s.name}:${s.displayValue}`),
           "linescores":                comp?.linescores?.map(l => l.displayValue ?? l.value),
         });
