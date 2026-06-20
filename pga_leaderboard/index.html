@@ -163,6 +163,28 @@
       color: #9aa0ad;
     }
 
+    .mc-badge {
+      display: inline-block;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #f87171;
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.04em;
+    }
+
+    .mc-rule-note {
+      max-width: 1100px;
+      margin: 0 auto 8px;
+      font-size: 0.78rem;
+      color: #6b7280;
+      text-align: center;
+    }
+
     /* loading placeholder */
     .skeleton {
       background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 75%);
@@ -297,6 +319,11 @@
   </div>
 </div>
 
+<!-- MC rule note (hidden until a picked player misses the US Open cut) -->
+<p class="mc-rule-note" id="mcRuleNote" style="display:none">
+  <span style="color:#f87171;font-weight:700">MC×2</span> — player missed the US Open cut; their PGA Championship score is doubled
+</p>
+
 <!-- Summary -->
 <div class="summary">
   <h2>Comparison</h2>
@@ -349,6 +376,11 @@
   const ESPN_URL =
     "https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga";
 
+  // US Open event ID (from ESPN – used to detect missed cuts)
+  const US_OPEN_EVENT_ID = "401811952";
+  const US_OPEN_URL =
+    `https://site.api.espn.com/apis/site/v2/sports/golf/leaderboard?league=pga&event=${US_OPEN_EVENT_ID}`;
+
   // ── Helpers ──────────────────────────────────────────────────────────────
   function scoreNum(displayValue) {
     if (!displayValue || displayValue === "E") return 0;
@@ -383,7 +415,32 @@
   }
 
   function normalizeName(n) {
-    return n.toLowerCase().replace(/[^a-z]/g, "");
+    return (n ?? "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z]/g, "");
+  }
+
+  // ── Fetch US Open missed cuts (status.type.id === "6") ───────────────────
+  async function fetchUSOpenMissedCuts() {
+    try {
+      const resp = await fetch(US_OPEN_URL, { cache: "no-store" });
+      if (!resp.ok) return new Set();
+      const data = await resp.json();
+      const missedCuts = new Set();
+      for (const ev of (data?.events ?? [])) {
+        for (const comp of (ev?.competitions?.[0]?.competitors ?? [])) {
+          if (comp?.status?.type?.id === "6") {
+            const name = comp?.athlete?.displayName ?? "";
+            if (name) missedCuts.add(normalizeName(name));
+          }
+        }
+      }
+      return missedCuts;
+    } catch {
+      return new Set();
+    }
   }
 
   // ── Render skeleton rows while loading ───────────────────────────────────
@@ -434,44 +491,45 @@
   }
 
   // ── Render one side ──────────────────────────────────────────────────────
-  function renderSide(picks, playerMap, tbodyId, totalId) {
+  function renderSide(picks, playerMap, tbodyId, totalId, missedCuts = new Set()) {
     const tbody = document.getElementById(tbodyId);
     const rows   = picks.map(name => {
-      const key  = normalizeName(name);
-      const data = playerMap[key] ?? { score: 0, round: "–", thru: "–", displayName: name, missing: true };
-      return { name, data };
+      const key   = normalizeName(name);
+      const data  = playerMap[key] ?? { score: 0, round: "–", thru: "–", displayName: name, missing: true };
+      const isMC  = missedCuts.has(normalizeName(name));
+      const effectiveScore = isMC ? data.score * 2 : data.score;
+      return { name, data, isMC, effectiveScore };
     });
 
-    // Determine which player is dropped (worst score in top-4 calculation)
-    const scores = rows.map(r => r.data.score);
-    const sorted = [...scores].sort((a, b) => a - b);
-    // The score that gets dropped is the one NOT in the best 4
-    // Find which index is the "extra" worst
+    // Determine which player is dropped (worst effective score in top-4 calculation)
+    const effectiveScores = rows.map(r => r.effectiveScore);
+    const sorted = [...effectiveScores].sort((a, b) => a - b);
     const top4Scores = sorted.slice(0, 4);
     let droppedIdx = -1;
     const usedIndices = new Set();
     for (let i = 0; i < rows.length; i++) {
-      const s = rows[i].data.score;
+      const s = rows[i].effectiveScore;
       const inTop4 = top4Scores.some((v, j) => v === s && !usedIndices.has(j) && (usedIndices.add(j), true));
       if (!inTop4) { droppedIdx = i; break; }
     }
 
     tbody.innerHTML = rows.map((r, i) => {
       const { data } = r;
-      const sc  = formatScore(data.score);
-      const cls = scoreClass(data.score);
+      const sc  = formatScore(r.effectiveScore);
+      const cls = scoreClass(r.effectiveScore);
       const dropped = i === droppedIdx ? " dropped" : "";
+      const mcBadge = r.isMC ? '<span class="mc-badge">MC×2</span>' : '';
       return `
         <tr class="${dropped}">
-          <td class="player-name">${r.name}</td>
+          <td class="player-name">${r.name}${mcBadge}</td>
           <td><span class="score-val ${cls}">${sc}</span></td>
           <td><span class="round-badge">${data.round}</span></td>
           <td>${data.thru}</td>
         </tr>`;
     }).join("");
 
-    const allSum  = scores.reduce((s, v) => s + v, 0);
-    const top4    = top4Sum(scores);
+    const allSum  = effectiveScores.reduce((s, v) => s + v, 0);
+    const top4    = top4Sum(effectiveScores);
 
     const totalEl = document.getElementById(totalId);
     totalEl.textContent = formatScore(allSum);
@@ -491,14 +549,23 @@
     renderSkeleton("andrewBody");
 
     try {
-      const resp = await fetch(ESPN_URL, { cache: "no-store" });
+      const [resp, missedCuts] = await Promise.all([
+        fetch(ESPN_URL, { cache: "no-store" }),
+        fetchUSOpenMissedCuts(),
+      ]);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
 
       const playerMap = buildPlayerMap(data);
 
-      const benResult    = renderSide(PICKS.ben,    playerMap, "benBody",    "benTotal");
-      const andrewResult = renderSide(PICKS.andrew, playerMap, "andrewBody", "andrewTotal");
+      const benResult    = renderSide(PICKS.ben,    playerMap, "benBody",    "benTotal",    missedCuts);
+      const andrewResult = renderSide(PICKS.andrew, playerMap, "andrewBody", "andrewTotal", missedCuts);
+
+      // Show MC rule note only when at least one picked player missed the US Open cut
+      const allPicks = [...PICKS.ben, ...PICKS.andrew];
+      const anyMC = allPicks.some(n => missedCuts.has(normalizeName(n)));
+      const noteEl = document.getElementById("mcRuleNote");
+      if (noteEl) noteEl.style.display = anyMC ? "block" : "none";
 
       // Summary – all 5
       const setScore = (id, val) => {
